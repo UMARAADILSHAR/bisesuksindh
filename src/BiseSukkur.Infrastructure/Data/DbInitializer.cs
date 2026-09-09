@@ -1,4 +1,4 @@
-﻿using BiseSukkur.Core.Entities;
+using BiseSukkur.Core.Entities;
 using BiseSukkur.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -114,10 +114,10 @@ public static class DbInitializer
         var sch1 = await context.Schools.FirstOrDefaultAsync(s => s.Code == "001");
         var sch2 = await context.Schools.FirstOrDefaultAsync(s => s.Code == "002");
 
-        // 3. Seed Users & Ensure Development Access
+        // 3. Seed Users & Ensure Access
         var effectivePassword = !string.IsNullOrWhiteSpace(seedPassword)
             ? seedPassword
-            : (isDevelopment ? "Admin@12345" : Guid.NewGuid().ToString("N")[..12] + "Aa1!");
+            : "Admin@12345";
 
         var defaultPasswordHash = BCrypt.Net.BCrypt.HashPassword(effectivePassword);
 
@@ -151,12 +151,12 @@ public static class DbInitializer
                     IsActive = true,
                     FailedLoginAttempts = 0,
                     LockoutEnd = null,
-                    MustChangePassword = isDevelopment ? false : true
+                    MustChangePassword = false
                 });
             }
-            else if (isDevelopment)
+            else
             {
-                // In local development, ensure password is synced to Admin@12345 and lockouts are cleared
+                // Ensure password is synced to Admin@12345, active, and lockouts/flags cleared
                 existingUser.PasswordHash = defaultPasswordHash;
                 existingUser.IsActive = true;
                 existingUser.FailedLoginAttempts = 0;
