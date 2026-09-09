@@ -1,0 +1,156 @@
+@page "/superadmin/dashboard"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IReportService ReportService
+@inject IWindowService WindowService
+@inject NavigationManager Navigation
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">SuperAdmin Executive Dashboard</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">BISE Hyderabad Board Overview & Performance Analytics (Academic Year @activeYearName)</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <a href="superadmin/verification" class="btn btn-primary btn-sm">
+            🧾 Verify Pending Challans (@(stats?.PendingInvoicesCount ?? 0))
+        </a>
+        <a href="superadmin/reports" class="btn btn-secondary btn-sm">
+            📈 Download Board Reports
+        </a>
+    </div>
+</div>
+
+@if (stats == null)
+{
+    <div style="text-align: center; padding: 3rem;">
+        <p style="color: var(--text-muted);">Loading Executive Board Analytics...</p>
+    </div>
+}
+else
+{
+    <!-- KPI Overview Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-icon blue">🏫</div>
+            <div class="kpi-data">
+                <div class="kpi-label">Registered Schools</div>
+                <div class="kpi-value">@stats.TotalSchools</div>
+                <div class="kpi-subtext">Across 5 Board Districts</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon green">📋</div>
+            <div class="kpi-data">
+                <div class="kpi-label">Enrolled Students</div>
+                <div class="kpi-value">@stats.TotalEnrollments</div>
+                <div class="kpi-subtext">SSC-I, SSC-II, HSC-I, HSC-II</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon purple">🎓</div>
+            <div class="kpi-data">
+                <div class="kpi-label">Exam Candidates</div>
+                <div class="kpi-value">@stats.TotalExams</div>
+                <div class="kpi-subtext">Forms Submitted</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon amber">💰</div>
+            <div class="kpi-data">
+                <div class="kpi-label">Total Revenue Collected</div>
+                <div class="kpi-value">Rs. @stats.TotalRevenue.ToString("N0")</div>
+                <div class="kpi-subtext">Pending: Rs. @stats.PendingInvoicesAmount.ToString("N0")</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2-Column Analytics Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+        <!-- Left: District Breakdown Table -->
+        <div class="card-surface">
+            <div class="card-header-flex">
+                <div class="card-header-title">
+                    <span>🗺️</span> District Wise Breakdown & Collections
+                </div>
+                <a href="superadmin/districts" class="btn btn-secondary btn-sm">Manage Districts</a>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>District</th>
+                            <th>Code</th>
+                            <th>Schools</th>
+                            <th>Enrollments</th>
+                            <th>Exam Forms</th>
+                            <th>Revenue Collected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dist in stats.DistrictBreakdown)
+                        {
+                            <tr>
+                                <td><strong>@dist.DistrictName</strong></td>
+                                <td><span class="badge badge-info">@dist.ShortCode</span></td>
+                                <td>@dist.SchoolCount</td>
+                                <td>@dist.EnrollmentCount</td>
+                                <td>@dist.ExamCount</td>
+                                <td style="font-weight: 700; color: #047857;">Rs. @dist.TotalFeesCollected.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right: Recent System Activities Feed -->
+        <div class="card-surface">
+            <div class="card-header-flex">
+                <div class="card-header-title">
+                    <span>📜</span> Recent Board Activities
+                </div>
+                <a href="superadmin/activity-logs" class="btn btn-secondary btn-sm">View All</a>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                @if (!stats.RecentActivities.Any())
+                {
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">No recent activities logged.</p>
+                }
+                else
+                {
+                    @foreach (var log in stats.RecentActivities)
+                    {
+                        <div style="padding: 0.75rem; background: var(--bg-app); border-radius: var(--radius-sm); border-left: 3px solid var(--brand-primary);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <span style="font-size: 0.75rem; font-weight: 700; color: var(--brand-primary); text-transform: uppercase;">
+                                    @log.LogName.Replace("_", " ")
+                                </span>
+                                <span style="font-size: 0.7rem; color: var(--text-muted);">
+                                    @log.CreatedAt.ToLocalTime().ToString("MMM dd, HH:mm")
+                                </span>
+                            </div>
+                            <p style="font-size: 0.825rem; color: var(--text-secondary); margin: 0;">@log.Description</p>
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">By: @(log.CausedByUsername ?? "System")</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SuperAdminStatsDto? stats;
+    private string activeYearName = "2026";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var year = await WindowService.GetActiveAcademicYearAsync();
+        if (year != null) activeYearName = year.YearName;
+        stats = await ReportService.GetSuperAdminStatsAsync(year?.Id);
+    }
+}

@@ -1,0 +1,112 @@
+@page "/superadmin/districts"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ISchoolService SchoolService
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Districts & Tehsils Directory</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage jurisdiction boundaries, district sequence short codes (HY, KP, NF, GH, SH), and constituent tehsils</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="OpenAddDistrictModal">
+            ➕ Add District
+        </button>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+    @foreach (var d in districts)
+    {
+        <div class="card-surface">
+            <div class="card-header-flex" style="margin-bottom: 0.75rem;">
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 700;">@d.Name</h3>
+                    <span class="badge badge-info">Code: @d.ShortCode</span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    @d.Schools.Count Schools
+                </div>
+            </div>
+
+            <div style="margin-top: 0.75rem;">
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase;">Tehsils & Sub-divisions:</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
+                    @if (!d.Tehsils.Any())
+                    {
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">No tehsils registered.</span>
+                    }
+                    else
+                    {
+                        @foreach (var t in d.Tehsils)
+                        {
+                            <span class="badge badge-secondary" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">@t.Name</span>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Add District Modal -->
+@if (showModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700;">Add District</h3>
+                <button type="button" @onclick="() => showModal = false" style="background: none; border: none; font-size: 1.4rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <EditForm Model="newDistrict" OnValidSubmit="SaveDistrict">
+                    <div class="form-group">
+                        <label class="form-label">District Name</label>
+                        <input type="text" class="form-control" @bind="newDistrict.Name" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Short Code (2 Letters e.g. HY, KP)</label>
+                        <input type="text" class="form-control" @bind="newDistrict.ShortCode" maxlength="3" required />
+                    </div>
+                    <div class="modal-footer-custom" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" @onclick="() => showModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save District</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<ToastNotification Message="@toastMessage" Type="@toastType" OnClose="() => toastMessage = null" />
+
+@code {
+    private List<District> districts = new();
+    private bool showModal = false;
+    private District newDistrict = new();
+    private string? toastMessage;
+    private string toastType = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDistricts();
+    }
+
+    private async Task LoadDistricts()
+    {
+        districts = await SchoolService.GetAllDistrictsAsync();
+    }
+
+    private void OpenAddDistrictModal()
+    {
+        newDistrict = new District();
+        showModal = true;
+    }
+
+    private async Task SaveDistrict()
+    {
+        await SchoolService.SaveDistrictAsync(newDistrict);
+        toastMessage = $"District '{newDistrict.Name}' added successfully.";
+        showModal = false;
+        await LoadDistricts();
+    }
+}

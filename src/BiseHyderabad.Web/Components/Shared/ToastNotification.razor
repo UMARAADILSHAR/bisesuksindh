@@ -1,0 +1,29 @@
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string Type { get; set; } = "success"; // success, danger, warning, info
+    [Parameter] public EventCallback OnClose { get; set; }
+}
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <div style="position: fixed; bottom: 24px; right: 24px; z-index: 9999; animation: slideIn 0.3s ease;">
+        <div class="alert-banner @Type" style="box-shadow: var(--shadow-xl); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; min-width: 300px; max-width: 450px;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-weight: 700; font-size: 1.1rem;">
+                    @if (Type == "success") { <span>✓</span> }
+                    else if (Type == "danger") { <span>⚠</span> }
+                    else { <span>ℹ</span> }
+                </span>
+                <span style="font-size: 0.9rem; font-weight: 500;">@Message</span>
+            </div>
+            <button type="button" @onclick="OnClose" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: inherit; opacity: 0.7;">×</button>
+        </div>
+    </div>
+}
+
+<style>
+    @@keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+</style>

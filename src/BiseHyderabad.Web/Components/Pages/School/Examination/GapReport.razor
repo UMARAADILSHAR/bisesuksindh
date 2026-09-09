@@ -1,0 +1,330 @@
+@page "/school/gap-reports"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IExaminationService ExamService
+@inject IWindowService WindowService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject ILogger<GapReport> Logger
+
+<div class="card-header-flex mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Style="text-transform: uppercase; font-weight: 800;">Examination Gap Analysis Report</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Candidates with verified and allotted Enrollment Numbers awaiting examination form submission</MudText>
+    </div>
+    <MudStack Row="true" Spacing="1">
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" OnClick="ExportToCsv" StartIcon="@Icons.Material.Filled.Download" Disabled="@(!filteredRows.Any())">
+            Export CSV
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href="school/examinations/create?part=1" StartIcon="@Icons.Material.Filled.Add">
+            SSC-I / HSC-I Form
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Tertiary" Size="Size.Small" Href="school/examinations/create?part=2" StartIcon="@Icons.Material.Filled.Add">
+            SSC-II / HSC-II Form
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" Href="school/examinations">
+            ← Exam List
+        </MudButton>
+    </MudStack>
+</div>
+
+@if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>@_errorMessage</span>
+            <MudButton Color="Color.Inherit" Variant="Variant.Outlined" Size="Size.Small" OnClick="LoadData">Retry</MudButton>
+        </div>
+    </MudAlert>
+}
+else
+{
+    <!-- Summary KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem;" class="mb-4 kpi-grid-container">
+        <KpiCard Title="Missing Exam Forms"
+                 Value="@($"{missingCount}")"
+                 Subtitle="@($"{missingCount} of {totalCandidates} registered candidates")"
+                 BadgeText="ACTION NEEDED"
+                 Variant="amber"
+                 IsLoading="@_isLoading" />
+
+        <KpiCard Title="Forms Submitted"
+                 Value="@($"{submittedCount}")"
+                 Subtitle="Admit cards processed"
+                 BadgeText="READY"
+                 Variant="emerald"
+                 IsLoading="@_isLoading" />
+
+        <KpiCard Title="Verified Candidates"
+                 Value="@($"{totalCandidates}")"
+                 Subtitle="Allotted official Reg #"
+                 BadgeText="ELIGIBLE"
+                 Variant="blue"
+                 IsLoading="@_isLoading" />
+    </div>
+
+    <!-- Filter Bar -->
+    <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="4">
+                <MudTextField T="string" @bind-Value="searchTerm" Placeholder="Search candidate, father, enrollment #..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" @bind-Value="selectedClass" Label="Class Level" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@("")">All Classes</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("SSC-I")">SSC-I</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("SSC-II")">SSC-II</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HSC-I")">HSC-I</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HSC-II")">HSC-II</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" @bind-Value="selectedGroup" Label="Group" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@("")">All Groups</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Science")">Science</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("General Regular")">General Regular</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Pre-Medical")">Pre-Medical</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Pre-Engineering")">Pre-Engineering</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Commerce")">Commerce</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Humanities")">Humanities</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-center">
+                <MudCheckBox T="bool" @bind-Value="showMissingOnly" Label="Missing only" Color="Color.Warning" Dense="true" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Table -->
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-4">
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="250px" />
+        </MudPaper>
+    }
+    else
+    {
+        <div class="card-surface" style="padding: 0; overflow: hidden;">
+            <div class="table-responsive">
+                <table class="grid-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 22%;">Candidate Name</th>
+                            <th style="width: 18%;">Father's Name</th>
+                            <th style="width: 14%;">Enrollment #</th>
+                            <th style="width: 14%;">Class & Group</th>
+                            <th style="width: 10%; text-align: center;">Type</th>
+                            <th style="width: 12%; text-align: center;">Exam Status</th>
+                            <th style="width: 10%; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!filteredRows.Any())
+                        {
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                                    No candidates found matching the selected filter criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var r in filteredRows)
+                            {
+                                var isPart2 = r.ClassLevel.StartsWith("SSC-II", StringComparison.OrdinalIgnoreCase) || r.ClassLevel.StartsWith("HSC-II", StringComparison.OrdinalIgnoreCase);
+                                var formUrl = isPart2 ? "school/examinations/create?part=2" : "school/examinations/create?part=1";
+
+                                <tr>
+                                    <td><strong style="color: var(--text-primary); text-transform: uppercase;">@r.StudentName</strong></td>
+                                    <td style="text-transform: uppercase; color: var(--text-secondary);">@(r.FatherName ?? "-")</td>
+                                    <td>
+                                        <MudTooltip Text="Click to copy Enrollment #" Placement="Placement.Top">
+                                            <span @onclick="@(() => CopyToClipboard(r.EnrollmentNumber, "Enrollment #"))"
+                                                  style="font-family: monospace; font-weight: 700; color: #047857; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(5, 150, 105, 0.08); border: 1px solid rgba(5, 150, 105, 0.25);"
+                                                  title="Click to copy">
+                                                @r.EnrollmentNumber
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.75rem; opacity: 0.75;" />
+                                            </span>
+                                        </MudTooltip>
+                                    </td>
+                                    <td>
+                                        <div><strong>@r.ClassLevel</strong></div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@r.Group</MudText>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@r.StudentType</MudChip>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        @if (r.HasExamForm)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
+                                                @(string.IsNullOrEmpty(r.ExamStatus) ? "Submitted" : r.ExamStatus)
+                                            </MudChip>
+                                        }
+                                        else
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">
+                                                Missing Form
+                                            </MudChip>
+                                        }
+                                    </td>
+                                    <td style="text-align: right;">
+                                        @if (!r.HasExamForm)
+                                        {
+                                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href="@formUrl">
+                                                Submit →
+                                            </MudButton>
+                                        }
+                                        else
+                                        {
+                                            <span style="font-size: 0.75rem; color: #047857; font-weight: 700;">✓ Ready</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<GapReportRowDto> rows = new();
+    private string searchTerm = "";
+    private string selectedClass = "";
+    private string selectedGroup = "";
+    private bool showMissingOnly = false;
+
+    private bool _isLoading = true;
+    private bool _hasError = false;
+    private string _errorMessage = "";
+
+    private int totalCandidates => rows.Count;
+    private int missingCount => rows.Count(r => !r.HasExamForm);
+    private int submittedCount => rows.Count(r => r.HasExamForm);
+
+    private IEnumerable<GapReportRowDto> filteredRows
+    {
+        get
+        {
+            var result = rows.AsEnumerable();
+
+            if (showMissingOnly)
+            {
+                result = result.Where(r => !r.HasExamForm);
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedClass))
+            {
+                result = result.Where(r => r.ClassLevel.StartsWith(selectedClass, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedGroup))
+            {
+                result = result.Where(r => r.Group.Equals(selectedGroup, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim().ToLower();
+                result = result.Where(r =>
+                    r.StudentName.ToLower().Contains(term) ||
+                    (r.FatherName != null && r.FatherName.ToLower().Contains(term)) ||
+                    r.EnrollmentNumber.ToLower().Contains(term));
+            }
+
+            return result;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        _hasError = false;
+        _errorMessage = "";
+
+        try
+        {
+            var session = AuthStateProvider.CurrentUserSession;
+            var activeYear = await WindowService.GetActiveAcademicYearAsync();
+            int schoolId = session?.SchoolId ?? 1;
+            int yearId = activeYear?.Id ?? 1;
+
+            rows = await ExamService.GetGapReportAsync(schoolId, yearId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load gap analysis report.");
+            _hasError = true;
+            _errorMessage = "Could not load examination gap report. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CopyToClipboard(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add($"Copied {label}: {text}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Clipboard copy error in GapReport.");
+        }
+    }
+
+    private async Task ExportToCsv()
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Candidate Name,Father Name,Enrollment Number,Class Level,Group,Student Type,Exam Form Status,Roll Number");
+
+            foreach (var r in filteredRows)
+            {
+                var name = EscapeCsv(r.StudentName);
+                var father = EscapeCsv(r.FatherName ?? "");
+                var enroll = EscapeCsv(r.EnrollmentNumber);
+                var cls = EscapeCsv(r.ClassLevel);
+                var grp = EscapeCsv(r.Group);
+                var type = EscapeCsv(r.StudentType);
+                var status = EscapeCsv(r.HasExamForm ? r.ExamStatus : "Missing");
+                var roll = EscapeCsv(r.RollNumber ?? "");
+
+                sb.AppendLine($"{name},{father},{enroll},{cls},{grp},{type},{status},{roll}");
+            }
+
+            await JSRuntime.InvokeVoidAsync("biseApp.downloadFile", "BISE_Gap_Analysis_Report.csv", "text/csv;charset=utf-8", sb.ToString());
+            Snackbar.Add("Gap Analysis CSV report generated and downloaded.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to export Gap Report CSV.");
+            Snackbar.Add("Could not export CSV file.", Severity.Error);
+        }
+    }
+
+    private static string EscapeCsv(string field)
+    {
+        if (field.Contains(',') || field.Contains('"') || field.Contains('\n'))
+        {
+            return $"\"{field.Replace("\"", "\"\"")}\"";
+        }
+        return field;
+    }
+}

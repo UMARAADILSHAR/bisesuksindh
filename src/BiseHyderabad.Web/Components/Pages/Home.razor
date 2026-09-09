@@ -1,0 +1,31 @@
+@page "/"
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+@code {
+    protected override void OnInitialized()
+    {
+        var session = AuthStateProvider.CurrentUserSession;
+        if (session == null)
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        switch (session.Role)
+        {
+            case UserRole.SuperAdmin:
+                Navigation.NavigateTo("/superadmin/dashboard", true);
+                break;
+            case UserRole.DistrictAdmin:
+                Navigation.NavigateTo("/district/dashboard", true);
+                break;
+            case UserRole.SchoolAdmin:
+                Navigation.NavigateTo("/school/dashboard", true);
+                break;
+            default:
+                Navigation.NavigateTo("/login", true);
+                break;
+        }
+    }
+}

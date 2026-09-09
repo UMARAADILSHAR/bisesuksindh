@@ -1,0 +1,121 @@
+@page "/school/reports"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IReportService ReportService
+@inject ISchoolService SchoolService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary);">Institutional Summary Reports</h2>
+        <p style="color: var(--text-secondary); font-size: 0.8125rem;">Printable enrollment registries, examination submissions summary, and financial deposit ledgers</p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" @onclick="Print">
+        Print Report
+    </button>
+</div>
+
+@if (stats == null)
+{
+    <p style="color: var(--text-muted); padding: 2rem;">Loading institutional report data...</p>
+}
+else
+{
+    <div class="card-surface" style="padding: 0; overflow: hidden;">
+        <div style="padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); background: #ffffff;">
+            <div style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary);">
+                Enrollment & Examination Breakdown
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+                Generated: @DateTime.UtcNow.ToLocalTime().ToString("dd MMM yyyy, HH:mm")
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="grid-table">
+                <thead>
+                    <tr>
+                        <th style="width: 28%;">Class Level</th>
+                        <th style="width: 18%; text-align: center;">Enrolled Candidates</th>
+                        <th style="width: 18%; text-align: center;">Exam Form Submissions</th>
+                        <th style="width: 18%; text-align: center;">Pending Submissions</th>
+                        <th style="width: 18%; text-align: center;">Completion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SSC-I (Class 9th)</strong></td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Ssc1Enrollments</td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Ssc1Exams</td>
+                        <td style="text-align: center;" class="cell-mono">@(Math.Max(0, stats.Ssc1Enrollments - stats.Ssc1Exams))</td>
+                        <td style="text-align: center;">
+                            <span class="badge badge-info">
+                                @(stats.Ssc1Enrollments > 0 ? Math.Round((decimal)stats.Ssc1Exams / stats.Ssc1Enrollments * 100, 1) : 0)%
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>SSC-II (Class 10th)</strong></td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Ssc2Enrollments</td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Ssc2Exams</td>
+                        <td style="text-align: center;" class="cell-mono">@(Math.Max(0, stats.Ssc2Enrollments - stats.Ssc2Exams))</td>
+                        <td style="text-align: center;">
+                            <span class="badge badge-info">
+                                @(stats.Ssc2Enrollments > 0 ? Math.Round((decimal)stats.Ssc2Exams / stats.Ssc2Enrollments * 100, 1) : 0)%
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>HSC-I (Class 11th)</strong></td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Hsc1Enrollments</td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Hsc1Exams</td>
+                        <td style="text-align: center;" class="cell-mono">@(Math.Max(0, stats.Hsc1Enrollments - stats.Hsc1Exams))</td>
+                        <td style="text-align: center;">
+                            <span class="badge badge-info">
+                                @(stats.Hsc1Enrollments > 0 ? Math.Round((decimal)stats.Hsc1Exams / stats.Hsc1Enrollments * 100, 1) : 0)%
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>HSC-II (Class 12th)</strong></td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Hsc2Enrollments</td>
+                        <td style="text-align: center;" class="cell-mono">@stats.Hsc2Exams</td>
+                        <td style="text-align: center;" class="cell-mono">@(Math.Max(0, stats.Hsc2Enrollments - stats.Hsc2Exams))</td>
+                        <td style="text-align: center;">
+                            <span class="badge badge-info">
+                                @(stats.Hsc2Enrollments > 0 ? Math.Round((decimal)stats.Hsc2Exams / stats.Hsc2Enrollments * 100, 1) : 0)%
+                            </span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f1f5f9; font-weight: 700;">
+                        <td><strong>TOTAL</strong></td>
+                        <td style="text-align: center;" class="cell-mono">@stats.TotalEnrollments</td>
+                        <td style="text-align: center;" class="cell-mono">@stats.TotalExams</td>
+                        <td style="text-align: center;" class="cell-mono">@(Math.Max(0, stats.TotalEnrollments - stats.TotalExams))</td>
+                        <td style="text-align: center;">
+                            <span class="badge badge-success">
+                                @(stats.TotalEnrollments > 0 ? Math.Round((decimal)stats.TotalExams / stats.TotalEnrollments * 100, 1) : 0)%
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private SchoolDashboardStatsDto? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var session = AuthStateProvider.CurrentUserSession;
+        int schoolId = session?.SchoolId ?? 1;
+        stats = await ReportService.GetSchoolDashboardStatsAsync(schoolId);
+    }
+
+    private async Task Print()
+    {
+        await JSRuntime.InvokeVoidAsync("biseApp.print");
+    }
+}

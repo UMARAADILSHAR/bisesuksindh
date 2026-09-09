@@ -1,0 +1,49 @@
+<div class="kpi-card @GetVariantClass()" style="@CustomStyle">
+    <div class="kpi-header">
+        <span class="kpi-label">@Title</span>
+        @if (!string.IsNullOrEmpty(BadgeText))
+        {
+            <span class="kpi-badge">@BadgeText</span>
+        }
+        else if (!string.IsNullOrEmpty(Icon))
+        {
+            <span class="kpi-icon">@Icon</span>
+        }
+    </div>
+    <div class="kpi-value @(IsMono ? "cell-mono" : "")">
+        @if (IsLoading)
+        {
+            <span class="skeleton-pulse" style="display: inline-block; width: 60%; height: 2rem; border-radius: 4px;"></span>
+        }
+        else
+        {
+            @Value
+        }
+    </div>
+    @if (!string.IsNullOrEmpty(Subtitle))
+    {
+        <div class="kpi-subtext">@Subtitle</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? BadgeText { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string Variant { get; set; } = "blue"; // blue, green, amber, purple, cyan, red
+    [Parameter] public bool IsMono { get; set; } = false;
+    [Parameter] public bool IsLoading { get; set; } = false;
+    [Parameter] public string? CustomStyle { get; set; }
+
+    private string GetVariantClass() => Variant.ToLowerInvariant() switch
+    {
+        "green" or "emerald" => "kpi-card-emerald",
+        "amber" or "orange" => "kpi-card-amber",
+        "purple" or "violet" => "kpi-card-purple",
+        "cyan" or "teal" => "kpi-card-cyan",
+        "red" or "danger" => "kpi-card-danger",
+        _ => "kpi-card-blue"
+    };
+}

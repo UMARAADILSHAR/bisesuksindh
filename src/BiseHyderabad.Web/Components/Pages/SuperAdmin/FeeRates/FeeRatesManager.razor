@@ -1,0 +1,337 @@
+@page "/superadmin/fee-rates"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IFeeRateService FeeRateService
+@inject IWindowService WindowService
+
+<style>
+    .rate-card-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #cbd5e1;
+        font-size: 0.8125rem;
+    }
+    .rate-card-table th {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-weight: 700;
+        text-align: left;
+        padding: 10px 14px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .rate-card-table td {
+        padding: 8px 14px;
+        border: 1px solid #cbd5e1;
+        vertical-align: middle;
+    }
+    .rate-card-table tr:hover {
+        background: #f8fafc;
+    }
+    .rate-input {
+        width: 120px;
+        height: 34px;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #0f172a;
+        background: #ffffff;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 4px;
+        outline: none;
+        box-sizing: border-box;
+        text-align: right;
+        font-family: monospace;
+    }
+    .rate-input:focus {
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.12);
+    }
+</style>
+
+<div class="card-header-flex" style="flex-wrap: wrap; gap: 12px;">
+    <div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.02em;">OFFICIAL CLASS & GROUP FEE MATRIX</h2>
+        <p style="color: var(--text-secondary); font-size: 0.8125rem;">Simplified fee schedule for all 4 Board classes and their respective study groups</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <button type="button" class="btn btn-success" @onclick="SaveAllRates" disabled="@isSaving" style="font-weight: 700; padding: 0.5rem 1.25rem;">
+            @(isSaving ? "Saving Rates..." : "💾 Save All Fee Rates")
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(toastMessage))
+{
+    <div class="alert-banner success" style="margin-bottom: 16px; background: #ecfdf5; border-color: #047857; color: #065f46;">
+        <span>✓ @toastMessage</span>
+    </div>
+}
+
+<!-- Quick Class Mass Fill Toolbar -->
+<div class="card-surface" style="padding: 1rem 1.25rem; margin-bottom: 16px; background: #f8fafc; border: 1.5px dashed #cbd5e1;">
+    <div style="font-size: 0.8125rem; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 8px;">
+        ⚡ Fast Class-Wide Rate Applier
+    </div>
+    <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+        <div style="width: 180px;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: #475569; text-transform: uppercase;">Target Class</label>
+            <select class="form-select" @bind="bulkClass" style="height: 36px; font-size: 0.8125rem;">
+                <option value="SSC-I 1ST ANNUAL">SSC-I 1ST ANNUAL</option>
+                <option value="SSC-II 2ND ANNUAL">SSC-II 2ND ANNUAL</option>
+                <option value="HSC-I 1ST ANNUAL">HSC-I 1ST ANNUAL</option>
+                <option value="HSC-II 2ND ANNUAL">HSC-II 2ND ANNUAL</option>
+            </select>
+        </div>
+        <div style="width: 150px;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: #475569; text-transform: uppercase;">Enrollment Fee (Rs.)</label>
+            <input type="number" class="form-control" @bind="bulkEnrollmentFee" placeholder="e.g. 1500" style="height: 36px;" />
+        </div>
+        <div style="width: 150px;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: #475569; text-transform: uppercase;">Exam Fee (Rs.)</label>
+            <input type="number" class="form-control" @bind="bulkExamFee" placeholder="e.g. 2200" style="height: 36px;" />
+        </div>
+        <div style="width: 150px;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: #475569; text-transform: uppercase;">Late Surcharge (Rs.)</label>
+            <input type="number" class="form-control" @bind="bulkLateFee" placeholder="e.g. 500" style="height: 36px;" />
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary" @onclick="ApplyBulkToClass" style="height: 36px; font-weight: 700; font-size: 0.8125rem;">
+                Apply to Class Groups
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Class Filter Tabs -->
+<div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+    <button type="button" class="btn @(selectedClassTab == "ALL" ? "btn-primary" : "btn-secondary") btn-sm" @onclick='() => selectedClassTab = "ALL"'>
+        All 4 Classes (16 Groups)
+    </button>
+    <button type="button" class="btn @(selectedClassTab == "SSC-I 1ST ANNUAL" ? "btn-primary" : "btn-secondary") btn-sm" @onclick='() => selectedClassTab = "SSC-I 1ST ANNUAL"'>
+        SSC-I 1ST ANNUAL
+    </button>
+    <button type="button" class="btn @(selectedClassTab == "SSC-II 2ND ANNUAL" ? "btn-primary" : "btn-secondary") btn-sm" @onclick='() => selectedClassTab = "SSC-II 2ND ANNUAL"'>
+        SSC-II 2ND ANNUAL
+    </button>
+    <button type="button" class="btn @(selectedClassTab == "HSC-I 1ST ANNUAL" ? "btn-primary" : "btn-secondary") btn-sm" @onclick='() => selectedClassTab = "HSC-I 1ST ANNUAL"'>
+        HSC-I 1ST ANNUAL
+    </button>
+    <button type="button" class="btn @(selectedClassTab == "HSC-II 2ND ANNUAL" ? "btn-primary" : "btn-secondary") btn-sm" @onclick='() => selectedClassTab = "HSC-II 2ND ANNUAL"'>
+        HSC-II 2ND ANNUAL
+    </button>
+</div>
+
+<!-- 16-Row Fee Matrix Grid Table -->
+<div class="card-surface" style="padding: 0; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="rate-card-table">
+            <thead>
+                <tr>
+                    <th style="width: 22%;">Class Level</th>
+                    <th style="width: 24%;">Study Group</th>
+                    <th style="width: 18%; text-align: right;">Enrollment Fee (Rs.)</th>
+                    <th style="width: 18%; text-align: right;">Exam Fee (Rs.)</th>
+                    <th style="width: 18%; text-align: right;">Late Surcharge (Rs.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in FilteredMatrix)
+                {
+                    <tr>
+                        <td>
+                            <strong style="color: var(--text-primary);">@row.ClassLevel</strong>
+                        </td>
+                        <td>
+                            <span class="badge @(row.Group.Contains("SCIENCE") || row.Group.Contains("PRE-") ? "badge-info" : "badge-purple")" style="font-size: 0.75rem; padding: 3px 8px;">
+                                @row.Group
+                            </span>
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px;">
+                                <span style="color: #64748b; font-size: 0.75rem;">Rs.</span>
+                                <input type="number" class="rate-input" @bind="row.EnrollmentFee" min="0" step="50" />
+                            </div>
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px;">
+                                <span style="color: #64748b; font-size: 0.75rem;">Rs.</span>
+                                <input type="number" class="rate-input" @bind="row.ExamFee" min="0" step="50" />
+                            </div>
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px;">
+                                <span style="color: #b45309; font-size: 0.75rem;">Rs.</span>
+                                <input type="number" class="rate-input" style="color: #b45309; border-color: #fde68a;" @bind="row.LateFee" min="0" step="50" />
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private int activeYearId = 1;
+    private bool isSaving = false;
+    private string? toastMessage;
+    private string selectedClassTab = "ALL";
+
+    // Fast Applier State
+    private string bulkClass = "SSC-I 1ST ANNUAL";
+    private int bulkEnrollmentFee = 1500;
+    private int bulkExamFee = 2200;
+    private int bulkLateFee = 500;
+
+    public class FeeMatrixRow
+    {
+        public string ClassLevel { get; set; } = "";
+        public string Group { get; set; } = "";
+        public int EnrollmentFee { get; set; } = 1500;
+        public int ExamFee { get; set; } = 2000;
+        public int LateFee { get; set; } = 500;
+        public int EnrollmentFeeRateId { get; set; }
+        public int ExamFeeRateId { get; set; }
+    }
+
+    private List<FeeMatrixRow> matrixRows = new();
+
+    private IEnumerable<FeeMatrixRow> FilteredMatrix =>
+        selectedClassTab == "ALL" ? matrixRows : matrixRows.Where(r => r.ClassLevel == selectedClassTab);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        activeYearId = activeYear?.Id ?? 1;
+        await LoadRates();
+    }
+
+    private async Task LoadRates()
+    {
+        var existingRates = await FeeRateService.GetFeeRatesAsync(activeYearId);
+
+        // Define the exact 16 Class & Group combinations
+        var standardCombinations = new List<(string Class, string Group)>
+        {
+            // SSC-I 1ST ANNUAL (3 groups)
+            ("SSC-I 1ST ANNUAL", "SCIENCE"),
+            ("SSC-I 1ST ANNUAL", "GENERAL REGULAR"),
+            ("SSC-I 1ST ANNUAL", "GENERAL PRIVATE"),
+
+            // SSC-II 2ND ANNUAL (3 groups)
+            ("SSC-II 2ND ANNUAL", "SCIENCE"),
+            ("SSC-II 2ND ANNUAL", "GENERAL REGULAR"),
+            ("SSC-II 2ND ANNUAL", "GENERAL PRIVATE"),
+
+            // HSC-I 1ST ANNUAL (5 groups)
+            ("HSC-I 1ST ANNUAL", "PRE-MEDICAL"),
+            ("HSC-I 1ST ANNUAL", "PRE-ENGINEERING"),
+            ("HSC-I 1ST ANNUAL", "HUMANITIES REGULAR"),
+            ("HSC-I 1ST ANNUAL", "HUMANITIES PRIVATE"),
+            ("HSC-I 1ST ANNUAL", "COMMERCE"),
+
+            // HSC-II 2ND ANNUAL (5 groups)
+            ("HSC-II 2ND ANNUAL", "PRE-MEDICAL"),
+            ("HSC-II 2ND ANNUAL", "PRE-ENGINEERING"),
+            ("HSC-II 2ND ANNUAL", "HUMANITIES REGULAR"),
+            ("HSC-II 2ND ANNUAL", "HUMANITIES PRIVATE"),
+            ("HSC-II 2ND ANNUAL", "COMMERCE")
+        };
+
+        matrixRows = new List<FeeMatrixRow>();
+
+        foreach (var (cls, grp) in standardCombinations)
+        {
+            var enrollRate = existingRates.FirstOrDefault(r => 
+                r.FeeType == "enrollment" && 
+                (r.ClassLevel == cls || r.ClassLevel == cls.Substring(0, 5)) && 
+                (r.GroupName.Equals(grp, StringComparison.OrdinalIgnoreCase)));
+
+            var examRate = existingRates.FirstOrDefault(r => 
+                r.FeeType == "exam" && 
+                (r.ClassLevel == cls || r.ClassLevel == cls.Substring(0, 5)) && 
+                (r.GroupName.Equals(grp, StringComparison.OrdinalIgnoreCase)));
+
+            matrixRows.Add(new FeeMatrixRow
+            {
+                ClassLevel = cls,
+                Group = grp,
+                EnrollmentFee = enrollRate != null ? (int)enrollRate.StandardFee : (cls.StartsWith("SSC") ? 1500 : 2000),
+                ExamFee = examRate != null ? (int)examRate.StandardFee : (cls.StartsWith("SSC") ? 2200 : 2800),
+                LateFee = enrollRate != null ? (int)enrollRate.LateFee : 500,
+                EnrollmentFeeRateId = enrollRate?.Id ?? 0,
+                ExamFeeRateId = examRate?.Id ?? 0
+            });
+        }
+    }
+
+    private void ApplyBulkToClass()
+    {
+        foreach (var row in matrixRows.Where(r => r.ClassLevel == bulkClass))
+        {
+            row.EnrollmentFee = bulkEnrollmentFee;
+            row.ExamFee = bulkExamFee;
+            row.LateFee = bulkLateFee;
+        }
+
+        toastMessage = $"Updated rates for all groups in '{bulkClass}'. Click 'Save All Fee Rates' to commit.";
+    }
+
+    private async Task SaveAllRates()
+    {
+        isSaving = true;
+        toastMessage = null;
+
+        try
+        {
+            foreach (var row in matrixRows)
+            {
+                // 1. Save Enrollment Fee Rate
+                var enrollRate = new Core.Entities.FeeRate
+                {
+                    Id = row.EnrollmentFeeRateId,
+                    AcademicYearId = activeYearId,
+                    FeeType = "enrollment",
+                    ClassLevel = row.ClassLevel,
+                    GroupName = row.Group,
+                    StudentType = "FRESH",
+                    FeeSlab = "public",
+                    StandardFee = row.EnrollmentFee,
+                    LateFee = row.LateFee,
+                    IsActive = true
+                };
+                var savedEnroll = await FeeRateService.SaveFeeRateAsync(enrollRate);
+                row.EnrollmentFeeRateId = savedEnroll.Id;
+
+                // 2. Save Exam Fee Rate
+                var examRate = new Core.Entities.FeeRate
+                {
+                    Id = row.ExamFeeRateId,
+                    AcademicYearId = activeYearId,
+                    FeeType = "exam",
+                    ClassLevel = row.ClassLevel,
+                    GroupName = row.Group,
+                    StudentType = "FRESH",
+                    FeeSlab = "public",
+                    StandardFee = row.ExamFee,
+                    LateFee = row.LateFee,
+                    IsActive = true
+                };
+                var savedExam = await FeeRateService.SaveFeeRateAsync(examRate);
+                row.ExamFeeRateId = savedExam.Id;
+            }
+
+            toastMessage = "All 16 class & group fee rates saved successfully!";
+        }
+        catch (Exception ex)
+        {
+            toastMessage = $"Error saving rates: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

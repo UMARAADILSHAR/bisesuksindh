@@ -1,0 +1,238 @@
+@page "/school/dashboard"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IReportService ReportService
+@inject ISchoolService SchoolService
+@inject IChallanService ChallanService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<Dashboard> Logger
+
+<!-- Window & Deadline Status Pill Badges -->
+@if (stats?.EnrollmentWindow != null || stats?.ExamWindow != null)
+{
+    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+        @if (stats?.EnrollmentWindow != null)
+        {
+            <WindowStatusAlert Window="@stats.EnrollmentWindow" WindowLabel="Enrollment" />
+        }
+        @if (stats?.ExamWindow != null)
+        {
+            <WindowStatusAlert Window="@stats.ExamWindow" WindowLabel="Examination" />
+        }
+    </div>
+}
+
+@if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>@_errorMessage</span>
+            <MudButton Color="Color.Inherit" Variant="Variant.Outlined" Size="Size.Small" OnClick="LoadDashboardData">Retry</MudButton>
+        </div>
+    </MudAlert>
+}
+else
+{
+    <!-- Main Dashboard Layout: 2x2 Cards on Left + Chart on Upper Right -->
+    <div class="dashboard-top-grid mb-4">
+        <!-- LEFT: 2x2 Colorful Rounded KPI Cards Grid -->
+        <div class="dashboard-kpi-grid">
+            <KpiCard Title="Enrolled Candidates"
+                     Value="@(stats?.TotalEnrollments.ToString() ?? "0")"
+                     Subtitle="@($"SSC-I: {stats?.Ssc1Enrollments ?? 0} | HSC-I: {stats?.Hsc1Enrollments ?? 0}")"
+                     BadgeText="ACTIVE"
+                     Variant="blue"
+                     IsLoading="@(stats == null)" />
+
+            <KpiCard Title="Exam Form Entries"
+                     Value="@(stats?.TotalExams.ToString() ?? "0")"
+                     Subtitle="@($"SSC-II: {stats?.Ssc2Exams ?? 0} | HSC-II: {stats?.Hsc2Exams ?? 0}")"
+                     BadgeText="SUBMITTED"
+                     Variant="emerald"
+                     IsLoading="@(stats == null)" />
+
+            <KpiCard Title="Pending Invoices"
+                     Value="@($"Rs. {(stats?.PendingInvoicesAmount ?? 0):N0}")"
+                     Subtitle="Awaiting Bank Deposit"
+                     BadgeText="UNPAID"
+                     Variant="amber"
+                     IsMono="true"
+                     IsLoading="@(stats == null)" />
+
+            <KpiCard Title="Reconciled Revenue"
+                     Value="@($"Rs. {(stats?.PaidInvoicesAmount ?? 0):N0}")"
+                     Subtitle="Verified Bank Receipts"
+                     BadgeText="PAID"
+                     Variant="purple"
+                     IsMono="true"
+                     IsLoading="@(stats == null)" />
+        </div>
+
+        <!-- RIGHT: Enrollment Distribution Donut Visual -->
+        <div class="card-surface" style="padding: 1.15rem; display: flex; flex-direction: column; justify-content: space-between; margin: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">
+                    Enrollment Distribution
+                </div>
+                <span class="badge badge-secondary" style="font-size: 0.65rem;">Active Session</span>
+            </div>
+
+            @{
+                int total = stats?.TotalEnrollments ?? 0;
+                int safeTotal = total > 0 ? total : 1;
+                int ssc1 = stats?.Ssc1Enrollments ?? 0;
+                int ssc2 = stats?.Ssc2Enrollments ?? 0;
+                int hsc1 = stats?.Hsc1Enrollments ?? 0;
+                int hsc2 = stats?.Hsc2Enrollments ?? 0;
+
+                double pSsc1 = (double)ssc1 / safeTotal * 100;
+                double pSsc2 = (double)ssc2 / safeTotal * 100;
+                double pHsc1 = (double)hsc1 / safeTotal * 100;
+                double pHsc2 = (double)hsc2 / safeTotal * 100;
+            }
+
+            <!-- Donut Visual -->
+            <div style="display: flex; flex-direction: column; align-items: center; padding: 0.25rem 0;">
+                <div style="position: relative; width: 140px; height: 140px;">
+                    <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg); border-radius: 50%;">
+                        <!-- Background Circle -->
+                        <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#f1f5f9" stroke-width="3.8"></circle>
+
+                        @if (total > 0)
+                        {
+                            <!-- SSC-I (Dark) -->
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#0f172a" stroke-width="3.8"
+                                    stroke-dasharray="@pSsc1 @(100 - pSsc1)" stroke-dashoffset="0"></circle>
+
+                            <!-- SSC-II (Green) -->
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#047857" stroke-width="3.8"
+                                    stroke-dasharray="@pSsc2 @(100 - pSsc2)" stroke-dashoffset="@(-pSsc1)"></circle>
+
+                            <!-- HSC-I (Sky Blue) -->
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#0284c7" stroke-width="3.8"
+                                    stroke-dasharray="@pHsc1 @(100 - pHsc1)" stroke-dashoffset="@(-(pSsc1 + pSsc2))"></circle>
+
+                            <!-- HSC-II (Purple) -->
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#6b21a8" stroke-width="3.8"
+                                    stroke-dasharray="@pHsc2 @(100 - pHsc2)" stroke-dashoffset="@(-(pSsc1 + pSsc2 + pHsc1))"></circle>
+                        }
+                    </svg>
+
+                    <!-- Center Label -->
+                    <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                        <span style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); line-height: 1;">@total</span>
+                        <span style="font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.04em; margin-top: 2px;">Candidates</span>
+                    </div>
+                </div>
+
+                <!-- Legend Breakdown -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.75rem; width: 100%; margin-top: 0.75rem; font-size: 0.72rem;">
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 2px; background: #0f172a; display: inline-block;"></span>
+                        <span style="color: var(--text-secondary);">SSC-I: <strong>@ssc1</strong></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 2px; background: #047857; display: inline-block;"></span>
+                        <span style="color: var(--text-secondary);">SSC-II: <strong>@ssc2</strong></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 2px; background: #0284c7; display: inline-block;"></span>
+                        <span style="color: var(--text-secondary);">HSC-I: <strong>@hsc1</strong></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 2px; background: #6b21a8; display: inline-block;"></span>
+                        <span style="color: var(--text-secondary);">HSC-II: <strong>@hsc2</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Class-wise Enrollment & Exam Progress Table (Clean Excel Grid with Loop) -->
+    <div class="card-surface" style="padding: 0; overflow: hidden; margin-bottom: 1.25rem;">
+        <div style="padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); background: #ffffff;">
+            <div style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary);">
+                Class-wise Enrollment & Examination Progress
+            </div>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="school/gap-reports" EndIcon="@Icons.Material.Filled.ArrowForward">
+                Gap Analysis Report
+            </MudButton>
+        </div>
+
+        <div class="table-responsive">
+            <table class="grid-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Class Level</th>
+                        <th style="width: 18%; text-align: center;">Enrolled Candidates</th>
+                        <th style="width: 18%; text-align: center;">Exam Forms Submitted</th>
+                        <th style="width: 18%; text-align: center;">Pending Exam Forms</th>
+                        <th style="width: 21%;">Submission Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        var progressRows = new[]
+                        {
+                            ("SSC-I (Class 9th)", stats?.Ssc1Enrollments ?? 0, stats?.Ssc1Exams ?? 0, "#0f172a"),
+                            ("SSC-II (Class 10th)", stats?.Ssc2Enrollments ?? 0, stats?.Ssc2Exams ?? 0, "#047857"),
+                            ("HSC-I (Class 11th)", stats?.Hsc1Enrollments ?? 0, stats?.Hsc1Exams ?? 0, "#0284c7"),
+                            ("HSC-II (Class 12th)", stats?.Hsc2Enrollments ?? 0, stats?.Hsc2Exams ?? 0, "#6b21a8")
+                        };
+                    }
+                    @foreach (var (className, enrolled, examSubmitted, colorHex) in progressRows)
+                    {
+                        var pending = Math.Max(0, enrolled - examSubmitted);
+                        var pct = enrolled > 0
+                            ? Math.Min(100, Math.Round((decimal)examSubmitted / enrolled * 100, 1))
+                            : 0;
+
+                        <tr>
+                            <td><strong>@className</strong></td>
+                            <td style="text-align: center;" class="cell-mono">@enrolled</td>
+                            <td style="text-align: center;" class="cell-mono">@examSubmitted</td>
+                            <td style="text-align: center;" class="cell-mono">@pending</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                                        <div style="width: @pct%; height: 100%; background: @colorHex; border-radius: 3px;"></div>
+                                    </div>
+                                    <span style="font-size: 0.72rem; font-weight: 700; width: 38px; text-align: right;">@pct%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private SchoolDashboardStatsDto? stats;
+    private bool _hasError = false;
+    private string _errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        _hasError = false;
+        _errorMessage = "";
+        try
+        {
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+            stats = await ReportService.GetSchoolDashboardStatsAsync(schoolId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load school dashboard stats.");
+            _hasError = true;
+            _errorMessage = "Could not load dashboard information. Please try again.";
+        }
+    }
+}

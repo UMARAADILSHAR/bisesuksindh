@@ -1,0 +1,316 @@
+@page "/school/invoices"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IChallanService ChallanService
+@inject IWindowService WindowService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject ILogger<InvoicesList> Logger
+
+<!-- Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+        <MudText Typo="Typo.h5" Style="text-transform: uppercase;">Invoices & Challans</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Official printable 4-part bank vouchers, verified fee receipts, and candidate lists</MudText>
+    </div>
+</div>
+
+@if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>@_errorMessage</span>
+            <MudButton Color="Color.Inherit" Variant="Variant.Outlined" Size="Size.Small" OnClick="RetryLoad">Retry</MudButton>
+        </div>
+    </MudAlert>
+}
+else
+{
+    <!-- KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem;" class="mb-4 kpi-grid-container">
+        <KpiCard Title="Total Invoices"
+                 Value="@(metrics?.TotalInvoices.ToString() ?? "0")"
+                 Subtitle="@($"Value: Rs. {(metrics?.TotalAmount ?? 0):N0}")"
+                 BadgeText="TOTAL"
+                 Variant="blue"
+                 IsLoading="@isLoadingStats" />
+
+        <KpiCard Title="Enrollment Challans"
+                 Value="@(metrics?.EnrollmentCount.ToString() ?? "0")"
+                 Subtitle="@($"Rs. {(metrics?.EnrollmentAmount ?? 0):N0}")"
+                 BadgeText="ENROLLMENT"
+                 Variant="emerald"
+                 IsLoading="@isLoadingStats" />
+
+        <KpiCard Title="Exam Challans"
+                 Value="@(metrics?.ExamCount.ToString() ?? "0")"
+                 Subtitle="@($"Rs. {(metrics?.ExamAmount ?? 0):N0}")"
+                 BadgeText="EXAM"
+                 Variant="purple"
+                 IsLoading="@isLoadingStats" />
+
+        <KpiCard Title="Verified Collections"
+                 Value="@($"Rs. {(metrics?.VerifiedAmount ?? 0):N0}")"
+                 Subtitle="@($"Pending: Rs. {(metrics?.PendingAmount ?? 0):N0}")"
+                 BadgeText="PAID"
+                 Variant="amber"
+                 IsMono="true"
+                 IsLoading="@isLoadingStats" />
+    </div>
+
+    <!-- Filters -->
+    <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" @bind-Value="searchTerm" Placeholder="Search invoice number, class, or student type..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              DebounceInterval="400" OnDebounceIntervalElapsed="OnSearchChanged" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" Value="@selectedStatus" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ValueChanged="@(async (string v) => { selectedStatus = v; await OnFilterChanged(); })">
+                    <MudSelectItem T="string" Value="@("")">All Statuses</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Pending")">Pending</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Verified")">Verified</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Rejected")">Rejected</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" Value="@selectedType" Label="Type" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ValueChanged="@(async (string v) => { selectedType = v; await OnFilterChanged(); })">
+                    <MudSelectItem T="string" Value="@("")">All Types</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("enrollment")">Enrollment</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("exam")">Examination</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- MudDataGrid Server-Side Pagination Table -->
+    <MudDataGrid T="Invoice" ServerData="LoadServerData" @ref="_dataGrid"
+                 Dense="true" Hover="true" Striped="true" Bordered="true"
+                 Loading="@isLoadingData" RowsPerPage="25"
+                 SortMode="SortMode.Single" Filterable="false"
+                 Style="border-radius: 8px; overflow: hidden;">
+        <Columns>
+            <PropertyColumn Property="x => x.InvoiceNumber" Title="Invoice #" Style="width: 175px; white-space: nowrap;">
+                <CellTemplate>
+                    <MudTooltip Text="Click to copy Invoice #" Placement="Placement.Top">
+                        <span @onclick="@(() => CopyToClipboard(context.Item.InvoiceNumber, "Invoice #"))"
+                              style="font-family: monospace; font-weight: 700; color: var(--mud-palette-primary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.2);"
+                              title="Click to copy">
+                            @context.Item.InvoiceNumber
+                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.75rem; opacity: 0.75;" />
+                        </span>
+                    </MudTooltip>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.InvoiceType" Title="Category" Style="width: 120px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Item.InvoiceType == "enrollment" ? Color.Info : Color.Tertiary)" Variant="Variant.Filled">
+                        @(context.Item.InvoiceType == "enrollment" ? "Enrollment" : "Examination")
+                    </MudChip>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.ClassGroupStudentType" Title="Class & Group" Style="min-width: 170px;" />
+            <PropertyColumn Property="x => x.StudentCount" Title="Candidates" Style="width: 100px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2" Style="font-family: monospace; text-align: center; font-weight: 600;">@context.Item.StudentCount</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Amount" Title="Payable Amount" Sortable="true" Style="width: 150px; text-align: right; white-space: nowrap;" HeaderStyle="text-align: right;">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2" Style="font-family: monospace; font-weight: 700; text-align: right;">Rs. @context.Item.Amount.ToString("N0")</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.GeneratedAt" Title="Generated Date" Sortable="true" Style="width: 150px; white-space: nowrap;">
+                <CellTemplate>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.GeneratedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Status" Title="Status" Style="min-width: 140px; text-align: center;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.Item.Status == InvoiceStatus.Verified ? Color.Success : context.Item.Status == InvoiceStatus.Pending ? Color.Warning : Color.Error)"
+                             Variant="Variant.Filled">
+                        @context.Item.Status
+                    </MudChip>
+                    @if (!string.IsNullOrEmpty(context.Item.RejectionReason))
+                    {
+                        <div class="mt-1" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 6px; font-size: 0.6875rem; color: #991b1b; text-align: left;">
+                            <strong>Reason:</strong> @context.Item.RejectionReason
+                        </div>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn Title="Documents" StickyRight="true" Sortable="false" Style="width: 160px; text-align: right; white-space: nowrap;" HeaderStyle="text-align: right;">
+                <CellTemplate>
+                    <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Href="@($"api/pdf/bank-challan/{context.Item.Id}")" Target="_blank">Bank Slip</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small" Href="@($"api/pdf/student-list/{context.Item.Id}")" Target="_blank">List</MudButton>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-4">No challan invoices found matching current criteria.</MudAlert>
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">Loading invoices...</MudText>
+        </LoadingContent>
+        <PagerContent>
+            <MudDataGridPager T="Invoice" PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudDataGrid>
+}
+
+@code {
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
+    private MudDataGrid<Invoice>? _dataGrid;
+    private InvoiceMetricsDto? metrics;
+
+    private string searchTerm = "";
+    private string selectedStatus = "";
+    private string selectedType = "";
+    private int? activeAcademicYearId;
+
+    private bool isLoadingData = true;
+    private bool isLoadingStats = true;
+    private bool _hasError = false;
+    private string _errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+    }
+
+    private async Task RetryLoad()
+    {
+        _hasError = false;
+        _errorMessage = "";
+        await LoadStats();
+        if (_dataGrid != null)
+        {
+            await _dataGrid.ReloadServerData();
+        }
+    }
+
+    private async Task CopyToClipboard(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add($"Copied {label}: {text}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Clipboard copy error in InvoicesList.");
+        }
+    }
+
+    private async Task<GridData<Invoice>> LoadServerData(GridState<Invoice> state, CancellationToken cancellationToken)
+    {
+        await _dbLock.WaitAsync(cancellationToken);
+        try
+        {
+            isLoadingData = true;
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+
+            var pagedRequest = new PagedRequest
+            {
+                PageNumber = state.Page + 1,
+                PageSize = state.PageSize,
+                SearchTerm = searchTerm,
+            };
+
+            if (activeAcademicYearId.HasValue)
+            {
+                pagedRequest.Filters["academicYearId"] = activeAcademicYearId.Value.ToString();
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedStatus))
+            {
+                pagedRequest.Filters["status"] = selectedStatus;
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedType))
+            {
+                pagedRequest.Filters["invoiceType"] = selectedType;
+            }
+
+            if (state.SortDefinitions.Any())
+            {
+                var sort = state.SortDefinitions.First();
+                pagedRequest.SortBy = sort.SortBy;
+                pagedRequest.SortDescending = sort.Descending;
+            }
+
+            var result = await ChallanService.GetPagedInvoicesAsync(schoolId, pagedRequest);
+
+            return new GridData<Invoice>
+            {
+                Items = result.Items,
+                TotalItems = result.TotalCount,
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load invoices server data.");
+            _hasError = true;
+            _errorMessage = "Could not load invoice data. Please try again.";
+            StateHasChanged();
+            return new GridData<Invoice> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            isLoadingData = false;
+            _dbLock.Release();
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        await _dbLock.WaitAsync();
+        try
+        {
+            isLoadingStats = true;
+            if (!activeAcademicYearId.HasValue)
+            {
+                var activeYear = await WindowService.GetActiveAcademicYearAsync();
+                activeAcademicYearId = activeYear?.Id;
+            }
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+            metrics = await ChallanService.GetInvoiceMetricsAsync(schoolId, activeAcademicYearId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load invoice metrics.");
+            _hasError = true;
+            _errorMessage = "Could not load invoice data. Please try again.";
+        }
+        finally
+        {
+            isLoadingStats = false;
+            _dbLock.Release();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        searchTerm = value;
+        if (_dataGrid != null)
+            await _dataGrid.ReloadServerData();
+    }
+
+    private async Task OnFilterChanged()
+    {
+        if (_dataGrid != null)
+            await _dataGrid.ReloadServerData();
+    }
+}

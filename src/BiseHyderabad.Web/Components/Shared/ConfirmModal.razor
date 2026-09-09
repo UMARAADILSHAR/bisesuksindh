@@ -1,0 +1,28 @@
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm Action";
+    [Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
+    [Parameter] public string ConfirmButtonText { get; set; } = "Confirm";
+    [Parameter] public string ConfirmButtonClass { get; set; } = "btn-primary";
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}
+
+@if (IsVisible)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">@Title</h3>
+                <button type="button" @onclick="OnCancel" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-muted);">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">@Message</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+                <button type="button" class="btn @ConfirmButtonClass" @onclick="OnConfirm">@ConfirmButtonText</button>
+            </div>
+        </div>
+    </div>
+}

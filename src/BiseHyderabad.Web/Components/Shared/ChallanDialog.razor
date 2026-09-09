@@ -1,0 +1,591 @@
+@* ChallanDialog.razor — Inline modal dialog for bank challan generation *@
+@inject IChallanService ChallanService
+@inject IWindowService WindowService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject IToastNotificationService ToastService
+@inject ISnackbar Snackbar
+
+@if (IsVisible)
+{
+    <div class="cdlg-backdrop" @onclick="HandleBackdropClick">
+        <div class="cdlg-panel" @onclick:stopPropagation>
+
+            <!-- Modal Header -->
+            <div class="cdlg-header">
+                <div>
+                    <h3 class="cdlg-title">Generate Bank Challan</h3>
+                </div>
+                <button type="button" class="cdlg-close" @onclick="Close" title="Close">✕</button>
+            </div>
+
+            <!-- Error Banner -->
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="cdlg-error">
+                    <span>⚠️</span> @errorMessage
+                </div>
+            }
+
+            <!-- ── Body depends on phase ── -->
+            @if (phase == Phase.Form)
+            {
+                <div class="cdlg-body">
+
+                    <!-- Class / Group / Category selects -->
+                    <div class="cdlg-selects">
+                        <div class="cdlg-field">
+                            <label class="cdlg-label">Class Level <span class="cdlg-req">*</span></label>
+                            <select class="cdlg-select" @bind="selectedClass" @bind:after="OnClassChanged">
+                                <option value="">— Select Class —</option>
+                                @foreach (var c in eligibleClasses)
+                                {
+                                    <option value="@c">@c</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="cdlg-field">
+                            <label class="cdlg-label">Study Group <span class="cdlg-req">*</span></label>
+                            <select class="cdlg-select" @bind="selectedGroup" @bind:after="OnGroupChanged" disabled="@(eligibleGroups.Count == 0)">
+                                <option value="">— Select Group —</option>
+                                @foreach (var g in eligibleGroups)
+                                {
+                                    <option value="@g">@g</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="cdlg-field">
+                            <label class="cdlg-label">Category <span class="cdlg-req">*</span></label>
+                            <select class="cdlg-select" @bind="selectedStudentType" @bind:after="OnStudentTypeChanged" disabled="@(eligibleStudentTypes.Count == 0)">
+                                <option value="">— Select Category —</option>
+                                @foreach (var st in eligibleStudentTypes)
+                                {
+                                    <option value="@st">@st</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Fee Rate Summary (appears when all 3 are selected) -->
+                    @if (feeResult != null && feeResult.FeeAmount.HasValue)
+                    {
+                        <div class="cdlg-fee-summary">
+                            <div class="cdlg-fee-row">
+                                <span class="cdlg-fee-label">Window Phase</span>
+                                <span class="badge @(feeResult.Phase == "normal" ? "badge-success" : feeResult.Phase == "grace" ? "badge-warning" : "badge-danger")">
+                                    @(feeResult.Phase == "normal" ? "Normal Fee Window" : feeResult.Phase == "grace" ? "Grace Period (Late Fee)" : "Closed")
+                                </span>
+                            </div>
+                            <div class="cdlg-fee-row">
+                                <span class="cdlg-fee-label">Fee Per Student</span>
+                                <strong style="font-size: 1.1rem; color: #047857;">Rs. @feeResult.FeeAmount?.ToString("N0")</strong>
+                            </div>
+                            @if (feeResult.LateFeeApplies == true)
+                            {
+                                <div style="font-size: 0.75rem; color: #b45309; margin-top: 4px;">⚠️ Includes late fee surcharge</div>
+                            }
+                        </div>
+                    }
+
+                    <!-- Candidate selection table (appears when criteria ready) -->
+                    @if (students.Any())
+                    {
+                        <div class="cdlg-students">
+                            <div class="cdlg-students-header">
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                                    <strong>@students.Count(s => s.IsIncluded)</strong> of <strong>@students.Count</strong> selected
+                                    · Total: <strong style="color: #047857;">Rs. @((students.Count(s => s.IsIncluded) * (feeResult?.FeeAmount ?? 0)).ToString("N0"))</strong>
+                                </span>
+                                <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleAll" style="font-size: 0.75rem;">
+                                    @(students.All(s => s.IsIncluded) ? "Deselect All" : "Select All")
+                                </button>
+                            </div>
+                            <div class="cdlg-table-wrap">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 36px; text-align: center;">✓</th>
+                                            <th>Student Name</th>
+                                            <th>Father's Name</th>
+                                            <th>GR No</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in students)
+                                        {
+                                            <tr style="cursor:pointer; background: @(s.IsIncluded ? "rgba(4,120,87,0.04)" : "transparent");"
+                                                @onclick="() => s.IsIncluded = !s.IsIncluded">
+                                                <td style="text-align:center;">
+                                                    <input type="checkbox" checked="@s.IsIncluded" @onclick:stopPropagation
+                                                           @onchange="() => s.IsIncluded = !s.IsIncluded" />
+                                                </td>
+                                                <td style="text-transform: uppercase;"><strong>@s.StudentName</strong></td>
+                                                <td style="color: var(--text-secondary); text-transform: uppercase;">@(s.FatherName ?? "—")</td>
+                                                <td><code style="font-size: 0.8rem;">@(s.GrNumber ?? "—")</code></td>
+                                                <td>
+                                                    <span class="badge @(s.PreviouslyExcluded ? "badge-warning" : "badge-success")">
+                                                        @(s.PreviouslyExcluded ? "Prev. Excluded" : "Ready")
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="cdlg-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
+                    <button type="button" class="btn btn-success"
+                            @onclick="GenerateChallan"
+                            disabled="@(!CanGenerate || isGenerating)">
+                        @(isGenerating ? "Generating..." : "Generate Bank Challan")
+                    </button>
+                </div>
+            }
+
+            @if (phase == Phase.Success && generationResult != null)
+            {
+                <div class="cdlg-body cdlg-success-body">
+                    <div class="cdlg-success-icon">✓</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 700; margin: 0.5rem 0;">Challan Generated Successfully!</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Invoice No: <strong style="font-size: 1.1rem; color: #047857;">@generationResult.InvoiceNumber</strong>
+                    </p>
+
+                    <div class="cdlg-result-grid">
+                        <div class="cdlg-result-item">
+                            <div class="cdlg-result-label">Candidates</div>
+                            <div class="cdlg-result-val">@generationResult.IncludedCount</div>
+                        </div>
+                        <div class="cdlg-result-item">
+                            <div class="cdlg-result-label">Fee / Student</div>
+                            <div class="cdlg-result-val">Rs. @generationResult.FeePerStudent.ToString("N0")</div>
+                        </div>
+                        <div class="cdlg-result-item">
+                            <div class="cdlg-result-label">Total Payable</div>
+                            <div class="cdlg-result-val" style="color: #047857;">Rs. @generationResult.TotalAmount.ToString("N0")</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cdlg-footer cdlg-success-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="ResetAndClose">Close</button>
+                    <a href="print/student-list/@generationResult.InvoiceId" target="_blank" class="btn btn-secondary">Candidate List</a>
+                    <a href="print/challan/@generationResult.InvoiceId" target="_blank" class="btn btn-primary">Print Challan</a>
+                </div>
+            }
+
+        </div>
+    </div>
+}
+
+<style>
+    /* ── Backdrop ── */
+    .cdlg-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        backdrop-filter: blur(2px);
+        animation: cdlg-fade-in 0.15s ease;
+    }
+    @@keyframes cdlg-fade-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    /* ── Dialog Panel ── */
+    .cdlg-panel {
+        background: #ffffff;
+        border-radius: 8px;
+        width: 100%;
+        max-width: 720px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+        animation: cdlg-slide-in 0.18s ease;
+    }
+    @@keyframes cdlg-slide-in {
+        from { transform: translateY(-16px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* ── Header ── */
+    .cdlg-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 18px 22px 14px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .cdlg-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0; }
+    .cdlg-subtitle { font-size: 0.78rem; color: #64748b; margin: 2px 0 0; }
+    .cdlg-close {
+        background: none; border: none; font-size: 1.1rem;
+        color: #94a3b8; cursor: pointer; padding: 2px 6px;
+        border-radius: 4px; transition: background 0.15s;
+    }
+    .cdlg-close:hover { background: #f1f5f9; color: #0f172a; }
+
+    /* ── Error ── */
+    .cdlg-error {
+        margin: 12px 22px 0;
+        padding: 10px 14px;
+        background: #ffebee;
+        color: #c62828;
+        border-left: 3px solid #d32f2f;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    /* ── Scrollable Body ── */
+    .cdlg-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    /* ── Locked type indicator ── */
+    .cdlg-type-indicator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: #f0f4ff;
+        border: 1px solid #c5cae9;
+        border-radius: 4px;
+    }
+    .cdlg-type-badge {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #303f9f;
+        background: #c5cae9;
+        padding: 3px 10px;
+        border-radius: 3px;
+        white-space: nowrap;
+    }
+    .cdlg-type-note {
+        font-size: 0.78rem;
+        color: #64748b;
+    }
+
+    /* ── Selects row ── */
+    .cdlg-selects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @@media (max-width: 600px) { .cdlg-selects { grid-template-columns: 1fr; } }
+    .cdlg-field { display: flex; flex-direction: column; gap: 3px; }
+    .cdlg-label { font-size: 0.73rem; font-weight: 600; color: #64748b; }
+    .cdlg-req { color: #d32f2f; }
+    .cdlg-select {
+        width: 100%; height: 36px; padding: 5px 10px;
+        font-size: 0.85rem; color: #0f172a;
+        border: 1px solid #e2e8f0; border-radius: 4px;
+        background: #fff; outline: none;
+        transition: border-color 0.15s;
+    }
+    .cdlg-select:focus { border-color: #3f51b5; }
+    .cdlg-select:disabled { background: #f8fafc; color: #94a3b8; }
+
+    /* ── Fee Summary ── */
+    .cdlg-fee-summary {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .cdlg-fee-row { display: flex; justify-content: space-between; align-items: center; }
+    .cdlg-fee-label { font-size: 0.8rem; color: #475569; font-weight: 600; }
+
+    /* ── Student table ── */
+    .cdlg-students { display: flex; flex-direction: column; gap: 8px; }
+    .cdlg-students-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 8px 0;
+        border-top: 1px solid #e2e8f0;
+    }
+    .cdlg-table-wrap { max-height: 240px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+
+    /* ── Footer ── */
+    .cdlg-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 22px;
+        border-top: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 0 0 8px 8px;
+    }
+
+    /* ── Success state ── */
+    .cdlg-success-body { align-items: center; text-align: center; padding: 28px 22px; }
+    .cdlg-success-icon {
+        width: 60px; height: 60px;
+        background: #dcfce7; color: #166534;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.6rem;
+        margin-bottom: 8px;
+    }
+    .cdlg-result-grid {
+        display: grid; grid-template-columns: repeat(3,1fr);
+        gap: 12px; width: 100%;
+        background: #f8fafc; border: 1px solid #e2e8f0;
+        border-radius: 6px; padding: 14px; margin-top: 16px;
+        text-align: left;
+    }
+    .cdlg-result-label { font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: .04em; }
+    .cdlg-result-val { font-size: 1rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
+    .cdlg-success-footer { justify-content: center; gap: 12px; }
+</style>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    /// <summary>"enrollment" or "exam" — set by the parent page, not changeable in the dialog.</summary>
+    [Parameter] public string ChallanType { get; set; } = "enrollment";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnChallanGenerated { get; set; }
+
+    private enum Phase { Form, Success }
+    private Phase phase = Phase.Form;
+
+    // challanType mirrors the Parameter for internal use
+    private string challanType => ChallanType;
+    private string ChallanTypeLabel => ChallanType == "exam" ? "Examination Fee Challan" : "Enrollment Fee Challan";
+
+    private string selectedClass = "";
+    private string selectedGroup = "";
+    private string selectedStudentType = "";
+
+    private List<string> eligibleClasses = new();
+    private List<string> eligibleGroups = new();
+    private List<string> eligibleStudentTypes = new();
+
+    private FeeRateResultDto? feeResult;
+    private List<StudentSelectionDto> students = new();
+    private ChallanGenerationResultDto? generationResult;
+
+    private string? errorMessage;
+    private bool isGenerating = false;
+
+    private bool CanGenerate =>
+        !string.IsNullOrEmpty(selectedClass) &&
+        !string.IsNullOrEmpty(selectedGroup) &&
+        !string.IsNullOrEmpty(selectedStudentType) &&
+        feeResult?.FeeAmount.HasValue == true &&
+        students.Any(s => s.IsIncluded);
+
+    private bool _wasVisible = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload classes whenever the dialog is first opened (or ChallanType changes)
+        if (IsVisible && !_wasVisible)
+        {
+            // Reset for fresh open
+            selectedClass = "";
+            selectedGroup = "";
+            selectedStudentType = "";
+            eligibleClasses.Clear();
+            eligibleGroups.Clear();
+            eligibleStudentTypes.Clear();
+            students.Clear();
+            feeResult = null;
+            errorMessage = null;
+            phase = Phase.Form;
+            generationResult = null;
+            await LoadEligibleClasses();
+        }
+        _wasVisible = IsVisible;
+    }
+
+    private async Task LoadEligibleClasses()
+    {
+        var session = AuthStateProvider.CurrentUserSession;
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        int schoolId = session?.SchoolId ?? 1;
+        int yearId = activeYear?.Id ?? 1;
+        eligibleClasses = await ChallanService.GetEligibleClassesAsync(schoolId, yearId, challanType);
+        if (!eligibleClasses.Any())
+            eligibleClasses = new List<string> { "SSC-I", "SSC-II", "HSC-I", "HSC-II" };
+
+        if (eligibleClasses.Count == 1)
+        {
+            selectedClass = eligibleClasses[0];
+            await OnClassChanged();
+        }
+    }
+
+    private async Task OnClassChanged()
+    {
+        selectedGroup = "";
+        selectedStudentType = "";
+        eligibleGroups.Clear();
+        eligibleStudentTypes.Clear();
+        students.Clear();
+        feeResult = null;
+        errorMessage = null;
+
+        if (string.IsNullOrEmpty(selectedClass)) return;
+
+        var session = AuthStateProvider.CurrentUserSession;
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        int schoolId = session?.SchoolId ?? 1;
+        int yearId = activeYear?.Id ?? 1;
+
+        eligibleGroups = await ChallanService.GetEligibleGroupsAsync(schoolId, yearId, challanType, selectedClass);
+        if (!eligibleGroups.Any())
+            eligibleGroups = selectedClass.StartsWith("SSC")
+                ? new List<string> { "SCIENCE", "GENERAL REGULAR", "Science", "General Regular" }
+                : new List<string> { "PRE-MEDICAL", "PRE-ENGINEERING", "COMMERCE", "HUMANITIES" };
+
+        if (eligibleGroups.Count == 1)
+        {
+            selectedGroup = eligibleGroups[0];
+            await OnGroupChanged();
+        }
+    }
+
+    private async Task OnGroupChanged()
+    {
+        selectedStudentType = "";
+        eligibleStudentTypes.Clear();
+        students.Clear();
+        feeResult = null;
+        errorMessage = null;
+
+        if (string.IsNullOrEmpty(selectedGroup)) return;
+
+        var session = AuthStateProvider.CurrentUserSession;
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        int schoolId = session?.SchoolId ?? 1;
+        int yearId = activeYear?.Id ?? 1;
+
+        eligibleStudentTypes = await ChallanService.GetEligibleStudentTypesAsync(schoolId, yearId, challanType, selectedClass, selectedGroup);
+        if (!eligibleStudentTypes.Any())
+            eligibleStudentTypes = new List<string> { "FRESH", "Regular", "Private", "Repeater" };
+
+        if (eligibleStudentTypes.Count == 1)
+        {
+            selectedStudentType = eligibleStudentTypes[0];
+            await OnStudentTypeChanged();
+        }
+    }
+
+    private async Task OnStudentTypeChanged()
+    {
+        students.Clear();
+        feeResult = null;
+        errorMessage = null;
+
+        if (string.IsNullOrEmpty(selectedStudentType)) return;
+
+        var session = AuthStateProvider.CurrentUserSession;
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        int schoolId = session?.SchoolId ?? 1;
+        int yearId = activeYear?.Id ?? 1;
+
+        // Load fee rate
+        feeResult = await ChallanService.GetFeeRateAsync(schoolId, challanType, selectedClass, selectedGroup, selectedStudentType, yearId);
+        if (!feeResult.FeeAmount.HasValue)
+        {
+            errorMessage = feeResult.ErrorMessage ?? "No fee rate configured for this combination.";
+            feeResult = null;
+            return;
+        }
+
+        // Load eligible students
+        students = await ChallanService.GetEligibleStudentsAsync(schoolId, yearId, challanType, selectedClass, selectedGroup, selectedStudentType);
+        if (!students.Any())
+            errorMessage = "No eligible candidates found for this selection.";
+    }
+
+    private void ToggleAll()
+    {
+        bool allSelected = students.All(s => s.IsIncluded);
+        foreach (var s in students) s.IsIncluded = !allSelected;
+    }
+
+    private async Task GenerateChallan()
+    {
+        isGenerating = true;
+        errorMessage = null;
+
+        var session = AuthStateProvider.CurrentUserSession;
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        int schoolId = session?.SchoolId ?? 1;
+        int yearId = activeYear?.Id ?? 1;
+
+        var request = new ChallanGenerationRequestDto
+        {
+            SchoolId = schoolId,
+            AcademicYearId = yearId,
+            ChallanType = challanType,
+            ClassLevel = selectedClass,
+            Group = selectedGroup,
+            StudentType = selectedStudentType,
+            Students = students,
+            Username = session?.Username ?? "SCH"
+        };
+
+        try
+        {
+            generationResult = await ChallanService.GenerateChallanAsync(request);
+            if (generationResult.Success)
+            {
+                phase = Phase.Success;
+                Snackbar.Add($"Bank Challan #{generationResult.InvoiceNumber} for Rs. {generationResult.TotalAmount:N0} generated successfully!", Severity.Success);
+                ToastService.ShowSuccess($"Bank Challan #{generationResult.InvoiceNumber} for Rs. {generationResult.TotalAmount:N0} generated successfully!", "Challan Created", 7000);
+                await OnChallanGenerated.InvokeAsync();
+            }
+            else
+            {
+                errorMessage = generationResult.ErrorMessage ?? "Failed to generate challan.";
+                Snackbar.Add(errorMessage, Severity.Error);
+                ToastService.ShowError(errorMessage, "Challan Generation Failed", 7000);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+            ToastService.ShowError(ex.Message, "Challan Error", 7000);
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task HandleBackdropClick() => await Close();
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task ResetAndClose()
+    {
+        // State reset handled in OnParametersSetAsync on next open
+        await OnClose.InvokeAsync();
+    }
+}

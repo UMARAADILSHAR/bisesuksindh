@@ -1,0 +1,366 @@
+@page "/superadmin/enrollment-hub"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IWindowService WindowService
+@inject ISchoolService SchoolService
+@inject IEnrollmentNumberService EnrollmentNumberService
+@inject IEnrollmentService EnrollmentService
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Enrollment Control Hub</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage global registration timelines, late fee windows, district/school overrides, and manual registration allotment</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <a href="superadmin/fee-rates" class="btn btn-secondary btn-sm">
+            💰 Fee Rates Matrix
+        </a>
+        <a href="superadmin/verification" class="btn btn-primary btn-sm">
+            🧾 Verify Invoices
+        </a>
+    </div>
+</div>
+
+<!-- Window Status Banner -->
+@if (windowSummary != null)
+{
+    <div class="alert-banner @(windowSummary.Phase == "normal" ? "success" : windowSummary.Phase == "grace" ? "warning" : "info")">
+        <div>
+            <strong>Enrollment Portal Status:</strong>
+            <span class="badge @(windowSummary.Phase == "normal" ? "badge-success" : windowSummary.Phase == "grace" ? "badge-warning" : "badge-danger")" style="margin-left: 0.5rem;">
+                @windowSummary.Label
+            </span>
+            @if (!string.IsNullOrEmpty(windowSummary.Countdown))
+            {
+                <span style="margin-left: 0.75rem; font-weight: 600;">⏳ Phase Deadline: @windowSummary.Countdown</span>
+            }
+        </div>
+        <div>
+            <span>Active Year: @(activeYear?.YearName ?? "2026")</span>
+        </div>
+    </div>
+}
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Global Timeline Settings -->
+    <div class="card-surface">
+        <div class="card-header-flex">
+            <div class="card-header-title">
+                <span>⚙️</span> Global Enrollment Timeline
+            </div>
+        </div>
+
+        @if (activeYear != null)
+        {
+            <EditForm Model="activeYear" OnValidSubmit="SaveGlobalSettings">
+                <div class="form-group">
+                    <label class="form-check-label" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
+                        <input type="checkbox" @bind="activeYear.IsEnrollmentOpen" />
+                        <span>Portal Open for Submissions</span>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Normal Start Date</label>
+                        <input type="date" class="form-control" @bind="activeYear.EnrollmentOpenStart" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Normal End Date</label>
+                        <input type="date" class="form-control" @bind="activeYear.EnrollmentOpenEnd" />
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Grace Period End Date</label>
+                        <input type="date" class="form-control" @bind="activeYear.EnrollmentGraceEnd" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Late Fee Amount (Rs.)</label>
+                        <input type="number" class="form-control" @bind="activeYear.EnrollmentLateFeeAmount" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-check-label" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
+                        <input type="checkbox" @bind="activeYear.IsEnrollmentGraceEnabled" />
+                        <span>Enable Grace Period with Late Fees</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Save Global Timeline
+                </button>
+            </EditForm>
+        }
+    </div>
+
+    <!-- Manual Allotment Tool -->
+    <div class="card-surface">
+        <div class="card-header-flex">
+            <div class="card-header-title">
+                <span>⚡</span> Manual Sequence Allotment Tool
+            </div>
+        </div>
+
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            Directly allot official BISE registration numbers (<code>E26...</code>) for candidates with verified payments.
+        </p>
+
+        <div class="form-group">
+            <label class="form-label">Candidate CNIC / B-Form</label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" class="form-control" @bind="lookupCnic" placeholder="41303-1234567-1" />
+                <button type="button" class="btn btn-secondary" @onclick="LookupCandidate">Find</button>
+            </div>
+        </div>
+
+        @if (searchedCandidate != null)
+        {
+            <div style="padding: 1rem; background: var(--bg-app); border-radius: var(--radius-md); margin-bottom: 1rem; border: 1px solid var(--border-subtle);">
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">@searchedCandidate.StudentName</div>
+                <div style="font-size: 0.825rem; color: var(--text-secondary);">School: @searchedCandidate.School?.Name</div>
+                <div style="font-size: 0.825rem; color: var(--text-secondary);">Class & Group: @searchedCandidate.ClassLevel (@searchedCandidate.Group)</div>
+                <div style="font-size: 0.825rem; margin-top: 0.5rem;">
+                    Registration #:
+                    @if (!string.IsNullOrEmpty(searchedCandidate.EnrollmentNumber))
+                    {
+                        <span class="badge badge-success">@searchedCandidate.EnrollmentNumber</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-warning">Not Allotted</span>
+                    }
+                </div>
+            </div>
+
+            @if (string.IsNullOrEmpty(searchedCandidate.EnrollmentNumber))
+            {
+                <button type="button" class="btn btn-success" style="width: 100%;" @onclick="AllotManualSequence">
+                    🚀 Generate & Allot Registration Number
+                </button>
+            }
+        }
+    </div>
+</div>
+
+<!-- District & School Window Overrides Table -->
+<div class="card-surface" style="margin-top: 1.5rem;">
+    <div class="card-header-flex">
+        <div class="card-header-title">
+            <span>🛡️</span> Special District & School Deadline Overrides
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="OpenAddOverrideModal">
+            ➕ Add Window Override
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Entity Name</th>
+                    <th>Extended Normal End</th>
+                    <th>Extended Grace End</th>
+                    <th>Late Fee (Rs.)</th>
+                    <th>Reason</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!overrides.Any())
+                {
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No custom window overrides currently active.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var ov in overrides)
+                    {
+                        <tr>
+                            <td><span class="badge badge-info">@ov.ScopeType</span></td>
+                            <td><strong>Scope ID: @ov.ScopeId</strong></td>
+                            <td>@(ov.NormalEnd?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>@(ov.GraceEnd?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>Rs. @ov.LateFeeAmount.ToString("N0")</td>
+                            <td>@(ov.Reason ?? "Special permission granted")</td>
+                            <td style="text-align: right;">
+                                <button type="button" class="btn btn-danger btn-sm" @onclick="() => DeleteOverride(ov.Id)">
+                                    🗑️ Revoke
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Override Modal -->
+@if (showOverrideModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700;">Grant Deadline Extension Override</h3>
+                <button type="button" @onclick="() => showOverrideModal = false" style="background: none; border: none; font-size: 1.4rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <EditForm Model="newOverride" OnValidSubmit="SaveOverride">
+                    <div class="form-group">
+                        <label class="form-label">Scope Level</label>
+                        <select class="form-select" @bind="newOverride.ScopeType">
+                            <option value="school">Individual School</option>
+                            <option value="district">Entire District</option>
+                        </select>
+                    </div>
+
+                    @if (newOverride.ScopeType == "school")
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Select School</label>
+                            <select class="form-select" @bind="newOverride.ScopeId">
+                                @foreach (var s in schools)
+                                {
+                                    <option value="@s.Id">@s.Name (@s.SemisCode)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Select District</label>
+                            <select class="form-select" @bind="newOverride.ScopeId">
+                                @foreach (var d in districts)
+                                {
+                                    <option value="@d.Id">@d.Name (@d.ShortCode)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Extended Normal End</label>
+                            <input type="date" class="form-control" @bind="newOverride.NormalEnd" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Extended Grace End</label>
+                            <input type="date" class="form-control" @bind="newOverride.GraceEnd" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Reason / Justification</label>
+                        <input type="text" class="form-control" @bind="newOverride.Reason" placeholder="e.g. Flood relief extension / Board resolution" required />
+                    </div>
+
+                    <div class="modal-footer-custom" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" @onclick="() => showOverrideModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Grant Extension</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<ToastNotification Message="@toastMessage" Type="@toastType" OnClose="() => toastMessage = null" />
+
+@code {
+    private AcademicYear? activeYear;
+    private WindowStatusSummaryDto? windowSummary;
+    private List<WindowOverride> overrides = new();
+    private List<School> schools = new();
+    private List<District> districts = new();
+
+    private string lookupCnic = "";
+    private Enrollment? searchedCandidate;
+
+    private bool showOverrideModal = false;
+    private WindowOverride newOverride = new() { WindowType = "enrollment" };
+    private string? toastMessage;
+    private string toastType = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        schools = await SchoolService.GetAllSchoolsAsync();
+        districts = await SchoolService.GetAllDistrictsAsync();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        activeYear = await WindowService.GetActiveAcademicYearAsync();
+        windowSummary = await WindowService.GetWindowStatusSummaryAsync("enrollment");
+        overrides = await WindowService.GetOverridesAsync("enrollment");
+    }
+
+    private async Task SaveGlobalSettings()
+    {
+        if (activeYear != null)
+        {
+            await WindowService.SaveAcademicYearAsync(activeYear);
+            toastMessage = "Global enrollment timeline updated successfully.";
+            toastType = "success";
+            await LoadData();
+        }
+    }
+
+    private async Task LookupCandidate()
+    {
+        searchedCandidate = null;
+        if (string.IsNullOrWhiteSpace(lookupCnic) || activeYear == null) return;
+
+        searchedCandidate = await EnrollmentService.GetEnrollmentByCnicAsync(lookupCnic, activeYear.Id);
+        if (searchedCandidate == null)
+        {
+            toastMessage = "No student found with this CNIC/B-Form in active year.";
+            toastType = "warning";
+        }
+    }
+
+    private async Task AllotManualSequence()
+    {
+        if (searchedCandidate == null) return;
+        var num = await EnrollmentNumberService.AllotSingleEnrollmentNumberAsync(searchedCandidate.Id, "superadmin");
+        toastMessage = $"Allotted registration number: {num}";
+        toastType = "success";
+        await LookupCandidate();
+    }
+
+    private void OpenAddOverrideModal()
+    {
+        newOverride = new WindowOverride
+        {
+            WindowType = "enrollment",
+            ScopeType = "school",
+            ScopeId = schools.FirstOrDefault()?.Id ?? 1,
+            NormalEnd = DateTime.UtcNow.AddDays(14),
+            GraceEnd = DateTime.UtcNow.AddDays(28),
+            IsGraceEnabled = true
+        };
+        showOverrideModal = true;
+    }
+
+    private async Task SaveOverride()
+    {
+        await WindowService.SaveOverrideAsync(newOverride);
+        toastMessage = "Override permission granted.";
+        toastType = "success";
+        showOverrideModal = false;
+        await LoadData();
+    }
+
+    private async Task DeleteOverride(int id)
+    {
+        await WindowService.DeleteOverrideAsync(id);
+        toastMessage = "Override revoked.";
+        toastType = "info";
+        await LoadData();
+    }
+}

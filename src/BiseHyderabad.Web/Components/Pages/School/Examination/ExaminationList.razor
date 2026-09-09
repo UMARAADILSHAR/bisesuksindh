@@ -1,0 +1,366 @@
+@page "/school/examinations"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IExaminationService ExamService
+@inject IWindowService WindowService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject ILogger<ExaminationList> Logger
+
+<ChallanDialog IsVisible="@showChallanDialog" ChallanType="exam" OnClose="() => showChallanDialog = false" OnChallanGenerated="OnChallanGenerated" />
+
+<!-- Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+        <MudText Typo="Typo.h5" Style="text-transform: uppercase;">Examination Forms</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Candidate exam forms, centers, seat allocations, and roll number slips</MudText>
+    </div>
+    <MudStack Row="true" Spacing="1">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href="school/examinations/create?part=1">SSC-I / HSC-I</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Tertiary" Size="Size.Small" Href="school/examinations/create?part=2">SSC-II / HSC-II</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" OnClick="() => showChallanDialog = true" StartIcon="@Icons.Material.Filled.Receipt">Challan</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" Href="school/gap-reports">Gap Report</MudButton>
+    </MudStack>
+</div>
+
+@if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>@_errorMessage</span>
+            <MudButton Color="Color.Inherit" Variant="Variant.Outlined" Size="Size.Small" OnClick="RetryLoad">Retry</MudButton>
+        </div>
+    </MudAlert>
+}
+else
+{
+    <!-- KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem;" class="mb-4 kpi-grid-container">
+        <KpiCard Title="Exam Submissions"
+                 Value="@(metrics?.TotalForms.ToString() ?? "0")"
+                 Subtitle="@($"Part-I: {metrics?.Part1Count ?? 0} | Part-II: {metrics?.Part2Count ?? 0}")"
+                 BadgeText="SUBMITTED"
+                 Variant="blue"
+                 IsLoading="@isLoadingStats" />
+
+        <KpiCard Title="Admit Slips Issued"
+                 Value="@(metrics?.SlipsIssued.ToString() ?? "0")"
+                 Subtitle="Roll Numbers Allocated"
+                 BadgeText="ISSUED"
+                 Variant="emerald"
+                 IsLoading="@isLoadingStats" />
+
+        <KpiCard Title="Pending Slips"
+                 Value="@(metrics?.PendingSlips.ToString() ?? "0")"
+                 Subtitle="Awaiting Center Allocation"
+                 BadgeText="PENDING"
+                 Variant="amber"
+                 IsLoading="@isLoadingStats" />
+
+        <KpiCard Title="Verified Submissions"
+                 Value="@(metrics?.VerifiedCount.ToString() ?? "0")"
+                 Subtitle="Verified by Board"
+                 BadgeText="VERIFIED"
+                 Variant="purple"
+                 IsLoading="@isLoadingStats" />
+    </div>
+
+    <!-- Filters -->
+    <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" @bind-Value="searchTerm" Placeholder="Search candidate name, CNIC, enrollment #, or roll #..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              DebounceInterval="400" OnDebounceIntervalElapsed="OnSearchChanged" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" Value="@selectedClass" Label="Class" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ValueChanged="@(async (string v) => { selectedClass = v; await OnFilterChanged(); })">
+                    <MudSelectItem T="string" Value="@("")">All Classes</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("SSC-I")">SSC-I</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("SSC-II")">SSC-II</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HSC-I")">HSC-I</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HSC-II")">HSC-II</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" Value="@selectedStatus" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ValueChanged="@(async (string v) => { selectedStatus = v; await OnFilterChanged(); })">
+                    <MudSelectItem T="string" Value="@("")">All Statuses</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Draft")">Draft</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Final")">Final</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Verified")">Verified</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- MudDataGrid Server-Side Pagination Table -->
+    <MudDataGrid T="ExaminationForm" ServerData="LoadServerData" @ref="_dataGrid"
+                 Dense="true" Hover="true" Striped="true" Bordered="true"
+                 Loading="@isLoadingData" RowsPerPage="25"
+                 SortMode="SortMode.Single" Filterable="false"
+                 Style="border-radius: 8px; overflow: hidden;">
+        <Columns>
+            <PropertyColumn Property="x => x.Enrollment!.StudentName" Title="Candidate Name" Style="min-width: 190px;">
+                <CellTemplate>
+                    <div>
+                        <strong style="color: var(--mud-palette-text-primary);">@(context.Item.Enrollment?.StudentName?.ToUpperInvariant() ?? "-")</strong>
+                        <div style="font-size: 0.72rem; color: var(--mud-palette-text-secondary);">S/O: @(context.Item.Enrollment?.FatherName?.ToUpperInvariant() ?? "-")</div>
+                    </div>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Enrollment!.EnrollmentNumber" Title="Enrollment #" Style="width: 175px; white-space: nowrap;">
+                <CellTemplate>
+                    @if (!string.IsNullOrEmpty(context.Item.Enrollment?.EnrollmentNumber))
+                    {
+                        <MudTooltip Text="Click to copy Enrollment #" Placement="Placement.Top">
+                            <span @onclick="@(() => CopyToClipboard(context.Item.Enrollment.EnrollmentNumber, "Enrollment #"))"
+                                  style="font-family: monospace; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.04);"
+                                  title="Click to copy">
+                                @context.Item.Enrollment.EnrollmentNumber
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.75rem; opacity: 0.65;" />
+                            </span>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <span style="font-size: 0.75rem; color: var(--mud-palette-text-secondary);">-</span>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.ClassLevel" Title="Class & Group" Style="width: 135px; white-space: nowrap;">
+                <CellTemplate>
+                    <div><strong>@context.Item.ClassLevel</strong></div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.Group</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.StudentType" Title="Type" Style="width: 90px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@context.Item.StudentType</MudChip>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.ExamCenter" Title="Designated Center" Style="min-width: 160px;">
+                <CellTemplate>
+                    <div>@(context.Item.ExamCenter?.Name ?? "Pending Allotment")</div>
+                    @if (context.Item.ExamCenter != null)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Code: @context.Item.ExamCenter.CenterCode</MudText>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.RollNumber" Title="Roll / Seat #" Style="width: 130px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    @if (!string.IsNullOrEmpty(context.Item.RollNumber))
+                    {
+                        <MudTooltip Text="Click to copy Roll #" Placement="Placement.Top">
+                            <span @onclick="@(() => CopyToClipboard(context.Item.RollNumber, "Roll #"))"
+                                  style="font-family: monospace; font-weight: 700; color: var(--mud-palette-primary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.2);"
+                                  title="Click to copy">
+                                @context.Item.RollNumber
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.75rem; opacity: 0.75;" />
+                            </span>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Default">Pending</MudText>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Status" Title="Status" Style="width: 100px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Item.Status == ExamFormStatus.Verified ? Color.Success : context.Item.Status == ExamFormStatus.Final ? Color.Info : Color.Default)" Variant="Variant.Filled">
+                        @context.Item.Status
+                    </MudChip>
+                </CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn Title="Slip / Result" StickyRight="true" Sortable="false" Style="width: 140px; text-align: right; white-space: nowrap;" HeaderStyle="text-align: right;">
+                <CellTemplate>
+                    @if (!string.IsNullOrEmpty(context.Item.RollNumber))
+                    {
+                        <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Href="@($"api/pdf/roll-slip/{context.Item.Id}")" Target="_blank">Slip</MudButton>
+                            @if (context.Item.Result != null && context.Item.Result.IsPassed)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small" Href="@($"api/pdf/certificate/{context.Item.Result.Id}")" Target="_blank">Cert</MudButton>
+                            }
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Default">-</MudText>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-4">No examination forms submitted yet.</MudAlert>
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">Loading examination forms...</MudText>
+        </LoadingContent>
+        <PagerContent>
+            <MudDataGridPager T="ExaminationForm" PageSizeOptions="new[] { 10, 25, 50, 100 }" />
+        </PagerContent>
+    </MudDataGrid>
+}
+
+@code {
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
+    private MudDataGrid<ExaminationForm>? _dataGrid;
+    private ExaminationMetricsDto? metrics;
+
+    private string searchTerm = "";
+    private string selectedClass = "";
+    private string selectedStatus = "";
+    private int? activeAcademicYearId;
+
+    private bool showChallanDialog = false;
+    private bool isLoadingData = true;
+    private bool isLoadingStats = true;
+    private bool _hasError = false;
+    private string _errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+    }
+
+    private async Task RetryLoad()
+    {
+        _hasError = false;
+        _errorMessage = "";
+        await LoadStats();
+        if (_dataGrid != null)
+        {
+            await _dataGrid.ReloadServerData();
+        }
+    }
+
+    private async Task CopyToClipboard(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add($"Copied {label}: {text}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Clipboard error in ExaminationList.");
+        }
+    }
+
+    private async Task<GridData<ExaminationForm>> LoadServerData(GridState<ExaminationForm> state, CancellationToken cancellationToken)
+    {
+        await _dbLock.WaitAsync(cancellationToken);
+        try
+        {
+            isLoadingData = true;
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+
+            var pagedRequest = new PagedRequest
+            {
+                PageNumber = state.Page + 1,
+                PageSize = state.PageSize,
+                SearchTerm = searchTerm,
+            };
+
+            if (activeAcademicYearId.HasValue)
+            {
+                pagedRequest.Filters["academicYearId"] = activeAcademicYearId.Value.ToString();
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedClass))
+            {
+                pagedRequest.Filters["classLevel"] = selectedClass;
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedStatus))
+            {
+                pagedRequest.Filters["status"] = selectedStatus;
+            }
+
+            if (state.SortDefinitions.Any())
+            {
+                var sort = state.SortDefinitions.First();
+                pagedRequest.SortBy = sort.SortBy;
+                pagedRequest.SortDescending = sort.Descending;
+            }
+
+            var result = await ExamService.GetPagedExaminationFormsAsync(schoolId, pagedRequest);
+
+            return new GridData<ExaminationForm>
+            {
+                Items = result.Items,
+                TotalItems = result.TotalCount,
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load examination forms server data.");
+            _hasError = true;
+            _errorMessage = "Could not load examination form data. Please try again.";
+            StateHasChanged();
+            return new GridData<ExaminationForm> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            isLoadingData = false;
+            _dbLock.Release();
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        await _dbLock.WaitAsync();
+        try
+        {
+            isLoadingStats = true;
+            if (!activeAcademicYearId.HasValue)
+            {
+                var activeYear = await WindowService.GetActiveAcademicYearAsync();
+                activeAcademicYearId = activeYear?.Id;
+            }
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+            metrics = await ExamService.GetExaminationMetricsAsync(schoolId, activeAcademicYearId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load examination metrics.");
+            _hasError = true;
+            _errorMessage = "Could not load examination form data. Please try again.";
+        }
+        finally
+        {
+            isLoadingStats = false;
+            _dbLock.Release();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        searchTerm = value;
+        if (_dataGrid != null)
+            await _dataGrid.ReloadServerData();
+    }
+
+    private async Task OnFilterChanged()
+    {
+        if (_dataGrid != null)
+            await _dataGrid.ReloadServerData();
+    }
+
+    private void OnChallanGenerated()
+    {
+        showChallanDialog = false;
+        _ = _dataGrid?.ReloadServerData();
+        _ = LoadStats();
+    }
+}

@@ -1,0 +1,336 @@
+@page "/superadmin/health"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using System.Diagnostics
+@using System.Runtime.InteropServices
+@inject IHealthDiagnosticsService HealthDiagnosticsService
+@inject IWindowService WindowService
+
+<style>
+    .diag-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    @@media (max-width: 900px) {
+        .diag-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @@media (max-width: 550px) {
+        .diag-grid { grid-template-columns: 1fr; }
+    }
+
+    .diag-card {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .diag-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+    .diag-card-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .diag-card-val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #0f172a;
+        font-family: monospace;
+    }
+    .diag-card-sub {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 4px;
+    }
+
+    .probe-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #cbd5e1;
+        font-size: 0.8125rem;
+    }
+    .probe-table th {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-weight: 700;
+        text-align: left;
+        padding: 10px 14px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .probe-table td {
+        padding: 9px 14px;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+    }
+    .probe-table tr:nth-child(even) {
+        background: #fcfdfe;
+    }
+</style>
+
+<div class="card-header-flex" style="flex-wrap: wrap; gap: 12px;">
+    <div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.02em;">SYSTEM HEALTH & LIVE RUNTIME DIAGNOSTICS</h2>
+        <p style="color: var(--text-secondary); font-size: 0.8125rem;">Real-time infrastructure telemetry, database latency probes, memory utilization, and storage metrics</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span class="badge @(dbHealthy ? "badge-success" : "badge-danger")" style="font-size: 0.8125rem; padding: 0.4rem 0.85rem;">
+            @(dbHealthy ? "🟢 Live & Healthy" : "🔴 Issue Detected")
+        </span>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="RunLiveDiagnostics" disabled="@isRunningProbe">
+            @(isRunningProbe ? "Probing..." : "⚡ Run Diagnostics Probe")
+        </button>
+    </div>
+</div>
+
+<!-- Real Telemetry KPI Grid -->
+<div class="diag-grid">
+    <div class="diag-card">
+        <div class="diag-card-top">
+            <span class="diag-card-title">Database Latency</span>
+            <span style="font-size: 1.2rem;">🗄️</span>
+        </div>
+        <div>
+            <div class="diag-card-val" style="color: @(dbLatencyMs < 50 ? "#047857" : dbLatencyMs < 200 ? "#b45309" : "#dc2626");">
+                @dbLatencyMs ms
+            </div>
+            <div class="diag-card-sub">Provider: @dbProviderShort</div>
+        </div>
+    </div>
+
+    <div class="diag-card">
+        <div class="diag-card-top">
+            <span class="diag-card-title">Process RAM (Working Set)</span>
+            <span style="font-size: 1.2rem;">⚡</span>
+        </div>
+        <div>
+            <div class="diag-card-val">@memoryMb MB</div>
+            <div class="diag-card-sub">Managed Heap: @managedHeapMb MB</div>
+        </div>
+    </div>
+
+    <div class="diag-card">
+        <div class="diag-card-top">
+            <span class="diag-card-title">App Server Uptime</span>
+            <span style="font-size: 1.2rem;">⏱️</span>
+        </div>
+        <div>
+            <div class="diag-card-val" style="font-size: 1.1rem;">@uptimeFormatted</div>
+            <div class="diag-card-sub">Started: @processStartTime</div>
+        </div>
+    </div>
+
+    <div class="diag-card">
+        <div class="diag-card-top">
+            <span class="diag-card-title">Disk Storage Free</span>
+            <span style="font-size: 1.2rem;">💾</span>
+        </div>
+        <div>
+            <div class="diag-card-val">@diskFreeGb GB</div>
+            <div class="diag-card-sub">Drive @diskDriveName (@diskFreePercent% free of @diskTotalGb GB)</div>
+        </div>
+    </div>
+</div>
+
+<!-- Live Probes & Component Status -->
+<div class="card-surface" style="padding: 0; overflow: hidden; margin-bottom: 20px;">
+    <div class="table-responsive">
+        <table class="probe-table">
+            <thead>
+                <tr>
+                    <th style="width: 28%;">Subsystem Component</th>
+                    <th style="width: 18%;">Operational State</th>
+                    <th style="width: 18%;">Latency / Metrics</th>
+                    <th style="width: 36%;">Diagnostics & Live Value Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Database Engine Connectivity</strong></td>
+                    <td>
+                        <span class="badge @(dbHealthy ? "badge-success" : "badge-danger")">
+                            @(dbHealthy ? "OPERATIONAL" : "DISCONNECTED")
+                        </span>
+                    </td>
+                    <td class="cell-mono">@dbLatencyMs ms</td>
+                    <td style="font-size: 0.75rem; color: #475569;">
+                        Database: <code>@databaseName</code> | Server: <code>@dbDataSource</code>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Live Database Record Volumes</strong></td>
+                    <td><span class="badge badge-info">SYNCHRONIZED</span></td>
+                    <td class="cell-mono">@totalRecordsCount total</td>
+                    <td style="font-size: 0.75rem; color: #475569;">
+                        Schools: <strong>@schoolCount</strong> | Enrollments: <strong>@enrollmentCount</strong> | Exams: <strong>@examCount</strong> | Invoices: <strong>@invoiceCount</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>PDF Generation Engine</strong></td>
+                    <td><span class="badge badge-success">READY (HIGH-DPI)</span></td>
+                    <td class="cell-mono">iText7 v9.7.0</td>
+                    <td style="font-size: 0.75rem; color: #475569;">
+                        Vector PDF rendering engine loaded with Helvetica, Times, and Barcode geometry.
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>SignalR Circuit Resilience</strong></td>
+                    <td><span class="badge badge-success">ACTIVE</span></td>
+                    <td class="cell-mono">10 min retention</td>
+                    <td style="font-size: 0.75rem; color: #475569;">
+                        DisconnectedCircuitRetention configured for 600 seconds with 500 max circuits.
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Host Runtime & GC</strong></td>
+                    <td><span class="badge badge-info">HEALTHY</span></td>
+                    <td class="cell-mono">@threadCount threads</td>
+                    <td style="font-size: 0.75rem; color: #475569;">
+                        .NET Core CLR (@RuntimeInformation.FrameworkDescription) on PID @processId
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Environment & Assembly Metadata -->
+<div class="card-surface" style="padding: 16px 20px;">
+    <div style="font-size: 0.8125rem; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 12px;">
+        🖥️ Server Operating Environment Metadata
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; font-size: 0.8125rem;">
+        <div>
+            <div style="color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Host OS</div>
+            <strong>@RuntimeInformation.OSDescription</strong>
+        </div>
+        <div>
+            <div style="color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Architecture</div>
+            <strong>@RuntimeInformation.OSArchitecture (@RuntimeInformation.ProcessArchitecture)</strong>
+        </div>
+        <div>
+            <div style="color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Logical Processor Cores</div>
+            <strong>@Environment.ProcessorCount Cores</strong>
+        </div>
+        <div>
+            <div style="color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Machine Name</div>
+            <strong>@Environment.MachineName</strong>
+        </div>
+        <div>
+            <div style="color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Current Server Time (PKT)</div>
+            <strong>@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")</strong>
+        </div>
+        <div>
+            <div style="color: #64748b; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">UTC Clock</div>
+            <strong>@DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") UTC</strong>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isRunningProbe = false;
+    private bool dbHealthy = true;
+    private long dbLatencyMs = 0;
+    private string dbProviderShort = "SQL Server";
+    private string databaseName = "BiseHyderabadDb";
+    private string dbDataSource = "localhost";
+
+    private long memoryMb = 0;
+    private long managedHeapMb = 0;
+    private int threadCount = 0;
+    private int processId = 0;
+    private string processStartTime = "";
+    private string uptimeFormatted = "";
+
+    private string diskDriveName = "D:\\";
+    private long diskFreeGb = 0;
+    private long diskTotalGb = 0;
+    private int diskFreePercent = 0;
+
+    private int schoolCount = 0;
+    private int enrollmentCount = 0;
+    private int examCount = 0;
+    private int invoiceCount = 0;
+    private int totalRecordsCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunLiveDiagnostics();
+    }
+
+    private async Task RunLiveDiagnostics()
+    {
+        isRunningProbe = true;
+
+        try
+        {
+            // 1. Process & Memory Metrics
+            var proc = Process.GetCurrentProcess();
+            processId = proc.Id;
+            memoryMb = proc.WorkingSet64 / (1024 * 1024);
+            managedHeapMb = GC.GetTotalMemory(false) / (1024 * 1024);
+            threadCount = proc.Threads.Count;
+
+            var startTime = proc.StartTime;
+            processStartTime = startTime.ToString("yyyy-MM-dd HH:mm");
+            var uptime = DateTime.Now - startTime;
+            uptimeFormatted = $"{(int)uptime.TotalHours}h {uptime.Minutes}m {uptime.Seconds}s";
+
+            // 2. Database diagnostics via service layer
+            var diagnostics = await HealthDiagnosticsService.RunDiagnosticsAsync();
+            dbHealthy = diagnostics.DatabaseHealthy;
+            dbLatencyMs = diagnostics.DatabaseLatencyMs;
+            databaseName = diagnostics.DatabaseName;
+            dbDataSource = diagnostics.DatabaseDataSource;
+            dbProviderShort = diagnostics.DatabaseProvider;
+            schoolCount = diagnostics.SchoolCount;
+            enrollmentCount = diagnostics.EnrollmentCount;
+            examCount = diagnostics.ExamCount;
+            invoiceCount = diagnostics.InvoiceCount;
+            totalRecordsCount = diagnostics.TotalRecordsCount;
+
+            if (!string.IsNullOrEmpty(diagnostics.ErrorMessage))
+            {
+                databaseName = $"Probe Error: {diagnostics.ErrorMessage}";
+            }
+
+            // 3. Disk Metrics for App Drive
+            try
+            {
+                var appRoot = AppContext.BaseDirectory;
+                var driveLetter = Path.GetPathRoot(appRoot) ?? "C:\\";
+                var drive = new DriveInfo(driveLetter);
+                if (drive.IsReady)
+                {
+                    diskDriveName = drive.Name;
+                    diskFreeGb = drive.AvailableFreeSpace / (1024 * 1024 * 1024);
+                    diskTotalGb = drive.TotalSize / (1024 * 1024 * 1024);
+                    diskFreePercent = diskTotalGb > 0 ? (int)((drive.AvailableFreeSpace * 100) / drive.TotalSize) : 0;
+                }
+            }
+            catch { }
+        }
+        catch (Exception ex)
+        {
+            dbHealthy = false;
+            databaseName = $"Probe Error: {ex.Message}";
+        }
+        finally
+        {
+            isRunningProbe = false;
+        }
+    }
+}

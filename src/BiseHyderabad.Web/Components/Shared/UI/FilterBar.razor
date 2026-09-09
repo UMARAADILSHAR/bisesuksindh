@@ -1,0 +1,35 @@
+<div class="filter-bar card-surface">
+    <div class="filter-bar-inner">
+        <div class="filter-search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text"
+                   class="form-control filter-search-input"
+                   placeholder="@Placeholder"
+                   value="@SearchTerm"
+                   @oninput="HandleInput" />
+        </div>
+        @if (Filters != null)
+        {
+            <div class="filter-controls">
+                @Filters
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Search records...";
+    [Parameter] public string? SearchTerm { get; set; }
+    [Parameter] public EventCallback<string> SearchTermChanged { get; set; }
+    [Parameter] public EventCallback OnSearch { get; set; }
+    [Parameter] public RenderFragment? Filters { get; set; }
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        SearchTerm = e.Value?.ToString() ?? "";
+        await SearchTermChanged.InvokeAsync(SearchTerm);
+        await OnSearch.InvokeAsync();
+    }
+}

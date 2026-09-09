@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BiseHyderabad.Core/BiseHyderabad.Core.csproj" />
+    <Project Path="src/BiseHyderabad.Application/BiseHyderabad.Application.csproj" />
+    <Project Path="src/BiseHyderabad.Infrastructure/BiseHyderabad.Infrastructure.csproj" />
+    <Project Path="src/BiseHyderabad.Web/BiseHyderabad.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BiseHyderabad.Core.Tests/BiseHyderabad.Core.Tests.csproj" />
+    <Project Path="tests/BiseHyderabad.Infrastructure.Tests/BiseHyderabad.Infrastructure.Tests.csproj" />
+    <Project Path="tests/BiseHyderabad.Web.Tests/BiseHyderabad.Web.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,81 @@
+@page "/superadmin/activity-logs"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IActivityLogService ActivityLogService
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">System Audit Trail & Activity Logs</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Immutable audit log of all logins, registrations, challan generations, and verification events</p>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" @onclick="LoadLogs">
+        🔄 Refresh Logs
+    </button>
+</div>
+
+<div class="card-surface" style="padding: 0; overflow: hidden;">
+    <div class="table-responsive">
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th style="width: 18%;">Timestamp</th>
+                    <th style="width: 18%;">Action Type</th>
+                    <th style="width: 34%;">Description</th>
+                    <th style="width: 15%;">Target Entity</th>
+                    <th style="width: 15%;">Initiated By</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!logs.Any())
+                {
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No system activities recorded.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var log in logs)
+                    {
+                        <tr>
+                            <td style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">
+                                @log.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                            </td>
+                            <td>
+                                <span class="badge badge-info">@log.LogName.Replace("_", " ").ToUpperInvariant()</span>
+                            </td>
+                            <td style="font-size: 0.8125rem;">@log.Description</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(log.SubjectType))
+                                {
+                                    <span style="font-size: 0.8rem; color: var(--text-secondary);">
+                                        @(log.SubjectType) #@(log.SubjectId)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="color: var(--text-muted);">-</span>
+                                }
+                            </td>
+                            <td>
+                                <strong>@(log.CausedByUsername ?? "System")</strong>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<ActivityLog> logs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        logs = await ActivityLogService.GetRecentLogsAsync(100);
+    }
+}

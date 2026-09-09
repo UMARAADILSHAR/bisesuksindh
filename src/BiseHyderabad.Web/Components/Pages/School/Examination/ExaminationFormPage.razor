@@ -1,0 +1,624 @@
+@page "/school/examinations/create"
+@page "/school/examinations/{id:int}/edit"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IExaminationService ExamService
+@inject IEnrollmentService EnrollmentService
+@inject IWindowService WindowService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IToastNotificationService ToastService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<style>
+    .exam-page-bg {
+        background: #f8fafc;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 24px 16px 48px 16px;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .exam-document {
+        width: 100%;
+        max-width: 960px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06);
+        padding: 28px 32px;
+        box-sizing: border-box;
+    }
+
+    .doc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #0f172a;
+    }
+    .doc-header h2 {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: -0.01em;
+    }
+    .doc-header p {
+        font-size: 0.8125rem;
+        color: #64748b;
+        margin: 4px 0 0 0;
+    }
+
+    .doc-section {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        background: #ffffff;
+        overflow: hidden;
+    }
+    .doc-section-header {
+        background: #f8fafc;
+        padding: 10px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: #0f172a;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .doc-section-body {
+        padding: 18px 20px;
+    }
+
+    /* Locked Read-Only Candidate Information Grid */
+    .candidate-locked-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px 18px;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 16px 18px;
+    }
+    @@media (max-width: 768px) {
+        .candidate-locked-grid { grid-template-columns: 1fr; }
+    }
+    .locked-item {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .locked-label {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .locked-value {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    /* Subjects Full-Border Grid Table */
+    .exam-subjects-grid {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+        border: 1px solid #cbd5e1;
+    }
+    .exam-subjects-grid th {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-weight: 700;
+        text-align: left;
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .exam-subjects-grid td {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+    }
+    .exam-subjects-grid tr:nth-child(even) {
+        background: #fcfdfe;
+    }
+
+    .btn-submit-exam {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 42px;
+        height: 44px;
+        font-size: 0.925rem;
+        font-weight: 700;
+        border-radius: 6px;
+        border: 1px solid #047857;
+        background: #047857;
+        color: #ffffff;
+        cursor: pointer;
+        font-family: inherit;
+        letter-spacing: 0.02em;
+        box-shadow: 0 2px 4px rgba(4, 120, 87, 0.2);
+        transition: all 0.15s ease;
+    }
+    .btn-submit-exam:hover:not(:disabled) {
+        background: #065f46;
+        border-color: #065f46;
+    }
+</style>
+
+<div class="exam-page-bg">
+    <div class="exam-document">
+
+        <!-- Document Header -->
+        <div class="doc-header">
+            <div>
+                <h2>
+                    @(isPart2 ? "SSC-II / HSC-II 2ND ANNUAL EXAMINATION FORM" : "SSC-I / HSC-I 1ST ANNUAL EXAMINATION FORM")
+                </h2>
+                <p>
+                    Board of Intermediate & Secondary Education Hyderabad &nbsp;|&nbsp; Session @activeYearName
+                </p>
+            </div>
+            <a href="school/examinations" class="btn btn-secondary btn-sm">
+                ← Back to List
+            </a>
+        </div>
+
+        <WindowStatusAlert Window="@examWindow" WindowLabel="Examination" />
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert-banner danger" style="margin-bottom: 16px;">
+                <span>⚠️ @errorMessage</span>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert-banner success" style="margin-bottom: 16px; background: #ecfdf5; border-color: #047857; color: #065f46;">
+                <span>✓ @successMessage</span>
+            </div>
+        }
+
+        <!-- ══════════ STEP 1: FETCH BY ENROLLMENT NUMBER ONLY ══════════ -->
+        @if (selectedEnrollment == null)
+        {
+            <div class="doc-section">
+                <div class="doc-section-header">
+                    <span>Step 1: Select Verified Enrolled Candidate by Enrollment Number</span>
+                </div>
+                <div class="doc-section-body">
+
+                    <!-- Search by Enrollment Number Only -->
+                    <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px;">
+                        <div style="flex: 1; min-width: 260px;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase;">
+                                Enter Allotted Enrollment Number *
+                            </label>
+                            <input type="text" class="form-control" @bind="fetchEnrollmentNo" placeholder="e.g. E26-SCI-0001 or Board Reg No." style="height: 42px; text-transform: uppercase;" />
+                        </div>
+                        <button type="button" class="btn btn-primary" @onclick="FetchByEnrollmentNo" style="height: 42px; font-weight: 700; padding: 0 20px;">
+                            🔍 Fetch by Enrollment No
+                        </button>
+                    </div>
+
+                    <!-- Quick List of Eligible Enrolled Candidates -->
+                    <div style="font-size: 0.8125rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; text-transform: uppercase;">
+                        Or Select From Enrolled Students (Allotted Enrollment #):
+                    </div>
+                    <div class="table-responsive" style="max-height: 320px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <table class="grid-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 28%;">Candidate Name</th>
+                                    <th style="width: 20%;">Enrollment #</th>
+                                    <th style="width: 24%;">Class & Group</th>
+                                    <th style="width: 14%;">Type</th>
+                                    <th style="width: 14%; text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!eligibleCandidates.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                                            No eligible candidates with allotted enrollment numbers waiting for exam form submission.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var c in eligibleCandidates)
+                                    {
+                                        <tr>
+                                            <td><strong style="color: var(--text-primary);">@c.StudentName.ToUpperInvariant()</strong></td>
+                                            <td><span class="cell-mono" style="font-weight: 700; color: var(--brand-primary);">@c.EnrollmentNumber</span></td>
+                                            <td>@c.ClassLevel (@c.Group)</td>
+                                            <td><span class="badge badge-secondary">@c.StudentType</span></td>
+                                            <td style="text-align: right;">
+                                                <button type="button" class="btn btn-primary btn-sm" @onclick="() => SelectCandidate(c)">
+                                                    Select Candidate →
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- ══════════ STEP 2: COMPLETE ENROLLMENT DATA (LOCKED / READ-ONLY) ══════════ -->
+            <div class="doc-section">
+                <div class="doc-section-header">
+                    <span>1. Verified Candidate Information (Locked from Enrollment)</span>
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="ResetSelection" style="font-size: 0.7rem; padding: 2px 8px;">
+                        Change Candidate
+                    </button>
+                </div>
+                <div class="doc-section-body">
+                    <div class="candidate-locked-grid">
+                        <div class="locked-item">
+                            <span class="locked-label">Candidate Full Name</span>
+                            <span class="locked-value">@selectedEnrollment.StudentName.ToUpperInvariant()</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Father's Full Name</span>
+                            <span class="locked-value">@(selectedEnrollment.FatherName?.ToUpperInvariant() ?? "-")</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">CNIC / B-Form No</span>
+                            <span class="locked-value cell-mono">@selectedEnrollment.Cnic</span>
+                        </div>
+
+                        <div class="locked-item">
+                            <span class="locked-label">Enrollment Registration #</span>
+                            <span class="locked-value cell-mono" style="color: #1e3a8a;">@selectedEnrollment.EnrollmentNumber</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Class Level</span>
+                            <span class="locked-value">@examForm.ClassLevel</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Study Group</span>
+                            <span class="locked-value">@examForm.Group</span>
+                        </div>
+
+                        <div class="locked-item">
+                            <span class="locked-label">Candidate Category</span>
+                            <span class="locked-value">@examForm.StudentType</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Date of Birth</span>
+                            <span class="locked-value">@selectedEnrollment.DateOfBirth.ToString("dd MMMM yyyy") (@selectedEnrollment.DateOfBirthWords)</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Gender & Religion</span>
+                            <span class="locked-value">@selectedEnrollment.Gender &nbsp;|&nbsp; @selectedEnrollment.Religion</span>
+                        </div>
+
+                        <div class="locked-item">
+                            <span class="locked-label">Medium of Instruction</span>
+                            <span class="locked-value">@selectedEnrollment.Medium</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Permanent Address</span>
+                            <span class="locked-value">@(string.IsNullOrEmpty(selectedEnrollment.Address) ? "-" : selectedEnrollment.Address)</span>
+                        </div>
+                        <div class="locked-item">
+                            <span class="locked-label">Institution / School</span>
+                            <span class="locked-value">@(selectedEnrollment.School?.Name ?? "School") (SEMIS: @(selectedEnrollment.School?.SemisCode ?? "-"))</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════ 2. SUBJECTS GRID (FULL BORDER GRID - NO TICKS) ══════════ -->
+            <div class="doc-section">
+                <div class="doc-section-header">
+                    <span>2. Examination Papers Scheme (Grid Layout)</span>
+                    <span style="font-size: 0.72rem; color: #64748b;">Annual Board Papers</span>
+                </div>
+                <div class="doc-section-body">
+
+                    <MudDataGrid T="SubjectSchemeItem" Items="@currentSubjects"
+                                 Dense="true" Hover="true" Striped="true" Bordered="true"
+                                 SortMode="SortMode.None" Filterable="false"
+                                 Style="border-radius: 8px; overflow: hidden;">
+                        <Columns>
+                            <TemplateColumn Title="Paper #" Style="width: 10%; text-align: center;" HeaderStyle="text-align: center;">
+                                <CellTemplate>
+                                    <MudText Typo="Typo.body2" Style="font-weight: 700; text-align: center;">
+                                        @(currentSubjects.IndexOf(context.Item) + 1)
+                                    </MudText>
+                                </CellTemplate>
+                            </TemplateColumn>
+                            <PropertyColumn Property="x => x.Name" Title="Subject Title" Style="width: 44%;">
+                                <CellTemplate>
+                                    <strong style="color: var(--mud-palette-text-primary);">@context.Item.Name</strong>
+                                </CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.IsCompulsory" Title="Classification" Style="width: 22%;">
+                                <CellTemplate>
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@(context.Item.IsCompulsory ? Color.Info : Color.Tertiary)"
+                                             Variant="Variant.Filled">
+                                        @(context.Item.IsCompulsory ? "Compulsory" : "Elective")
+                                    </MudChip>
+                                </CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.Code" Title="Paper Code" Style="width: 14%; text-align: center;" HeaderStyle="text-align: center;">
+                                <CellTemplate>
+                                    <MudText Typo="Typo.body2" Style="font-family: monospace; font-weight: 600; text-align: center;">
+                                        @context.Item.Code
+                                    </MudText>
+                                </CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.MaxMarks" Title="Max Marks" Style="width: 10%; text-align: right;" HeaderStyle="text-align: right;">
+                                <CellTemplate>
+                                    <MudText Typo="Typo.body2" Style="font-family: monospace; font-weight: 700; text-align: right;">
+                                        @context.Item.MaxMarks
+                                    </MudText>
+                                </CellTemplate>
+                            </PropertyColumn>
+                        </Columns>
+                    </MudDataGrid>
+
+                </div>
+            </div>
+
+            <!-- Submit Action -->
+            <div style="display: flex; justify-content: center; padding-top: 16px;">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large"
+                           OnClick="SubmitExamForm" Disabled="@isSaving"
+                           StartIcon="@Icons.Material.Filled.CheckCircle">
+                    @(isSaving ? "Submitting Examination Form..." : "Submit Examination Admission Form")
+                </MudButton>
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "part")] public int? Part { get; set; }
+
+    private bool isPart2 => Part == 2;
+    private string activeYearName = "2025 – 2026";
+    private string fetchEnrollmentNo = "";
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isSaving = false;
+
+    private List<Enrollment> eligibleCandidates = new();
+    private Enrollment? selectedEnrollment;
+    private ExaminationForm examForm = new();
+    private WindowStatusSummaryDto? examWindow;
+    private bool _isDirty;
+    private IDisposable? _locationChangingRegistration;
+
+    private class SubjectSchemeItem
+    {
+        public string Name { get; set; } = "";
+        public bool IsCompulsory { get; set; }
+        public string Code { get; set; } = "";
+        public int MaxMarks { get; set; } = 100;
+    }
+
+    private List<SubjectSchemeItem> currentSubjects = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _locationChangingRegistration = Navigation.RegisterLocationChangingHandler(OnLocationChanging);
+
+        var session = AuthStateProvider.CurrentUserSession;
+        var activeYear = await WindowService.GetActiveAcademicYearAsync();
+        if (activeYear != null) activeYearName = activeYear.YearName;
+
+        int schoolId = session?.SchoolId ?? 1;
+        int yearId = activeYear?.Id ?? 1;
+
+        examWindow = await WindowService.GetWindowStatusSummaryAsync("exam", schoolId);
+
+        // ONLY enrolled students with allotted Enrollment Numbers can fill the exam form
+        var allEnrollments = await EnrollmentService.GetEnrollmentsBySchoolAsync(schoolId, yearId);
+        eligibleCandidates = allEnrollments
+            .Where(e => !string.IsNullOrEmpty(e.EnrollmentNumber) && e.ExaminationForm == null)
+            .ToList();
+
+        if (Id.HasValue && Id.Value > 0)
+        {
+            var existing = await ExamService.GetExaminationFormByIdAsync(Id.Value);
+            if (existing != null)
+            {
+                examForm = existing;
+                selectedEnrollment = existing.Enrollment;
+                SetupSubjects();
+            }
+        }
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (_isDirty && !isSaving)
+        {
+            var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave this page?");
+            if (!confirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _locationChangingRegistration?.Dispose();
+    }
+
+    private async Task FetchByEnrollmentNo()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        var cleanEnrollmentNo = (fetchEnrollmentNo ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(cleanEnrollmentNo))
+        {
+            errorMessage = "Please enter candidate Allotted Enrollment Number.";
+            return;
+        }
+
+        var found = await EnrollmentService.LookupPreviousSscRecordAsync(cleanEnrollmentNo, null);
+        if (found != null)
+        {
+            if (string.IsNullOrEmpty(found.EnrollmentNumber))
+            {
+                errorMessage = "Candidate enrollment has not yet been allotted an official Board Enrollment Number. Please ensure enrollment challan is verified.";
+                return;
+            }
+
+            SelectCandidate(found);
+            successMessage = $"Verified enrollment record fetched for candidate '{found.StudentName.ToUpperInvariant()}'.";
+        }
+        else
+        {
+            errorMessage = $"No enrolled candidate found with Enrollment Number '{cleanEnrollmentNo}'.";
+        }
+    }
+
+    private void SelectCandidate(Enrollment c)
+    {
+        selectedEnrollment = c;
+        examForm.EnrollmentId = c.Id;
+        examForm.SchoolId = c.SchoolId;
+        examForm.ClassLevel = isPart2
+            ? (c.ClassLevel.StartsWith("SSC") ? "SSC-II 2ND ANNUAL" : "HSC-II 2ND ANNUAL")
+            : (c.ClassLevel.StartsWith("SSC") ? "SSC-I 1ST ANNUAL" : "HSC-I 1ST ANNUAL");
+        examForm.Group = c.Group;
+        examForm.StudentType = c.StudentType;
+        examForm.AcademicYearId = c.AcademicYearId;
+        _isDirty = true;
+
+        SetupSubjects();
+    }
+
+    private void ResetSelection()
+    {
+        selectedEnrollment = null;
+        examForm = new();
+        currentSubjects.Clear();
+        fetchEnrollmentNo = "";
+        errorMessage = null;
+        successMessage = null;
+        _isDirty = false;
+    }
+
+    private void SetupSubjects()
+    {
+        currentSubjects.Clear();
+        var grp = (selectedEnrollment?.Group ?? "SCIENCE").ToUpperInvariant();
+        var isSsc = (selectedEnrollment?.ClassLevel ?? "SSC-I").StartsWith("SSC", StringComparison.OrdinalIgnoreCase);
+
+        if (isSsc)
+        {
+            // SSC Scheme
+            currentSubjects.Add(new SubjectSchemeItem { Name = "English", IsCompulsory = true, Code = "ENG-01", MaxMarks = 100 });
+            currentSubjects.Add(new SubjectSchemeItem { Name = selectedEnrollment?.Medium == "Sindhi" ? "Sindhi" : "Urdu", IsCompulsory = false, Code = selectedEnrollment?.Medium == "Sindhi" ? "SND-01" : "URD-01", MaxMarks = 100 });
+            currentSubjects.Add(new SubjectSchemeItem { Name = selectedEnrollment?.Religion == "Muslim" ? "Islamiat / Islamic Studies" : "Ethics / Civics", IsCompulsory = false, Code = "ISL-01", MaxMarks = 50 });
+            currentSubjects.Add(new SubjectSchemeItem { Name = "Pakistan Studies", IsCompulsory = false, Code = "PST-01", MaxMarks = 50 });
+
+            if (grp.Contains("SCIENCE") || grp == "SCIENCE")
+            {
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Physics", IsCompulsory = true, Code = "PHY-01", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Chemistry", IsCompulsory = true, Code = "CHM-01", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Mathematics", IsCompulsory = true, Code = "MTH-01", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Biology / Computer Science", IsCompulsory = true, Code = "BIO-01", MaxMarks = 100 });
+            }
+            else // General / Arts
+            {
+                currentSubjects.Add(new SubjectSchemeItem { Name = "General Science", IsCompulsory = true, Code = "GSC-01", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "General Mathematics", IsCompulsory = true, Code = "GMT-01", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Economics / Civics", IsCompulsory = true, Code = "ECO-01", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Islamic History", IsCompulsory = true, Code = "ISH-01", MaxMarks = 100 });
+            }
+        }
+        else
+        {
+            // HSC Scheme
+            currentSubjects.Add(new SubjectSchemeItem { Name = "English", IsCompulsory = true, Code = "H-ENG", MaxMarks = 100 });
+            currentSubjects.Add(new SubjectSchemeItem { Name = selectedEnrollment?.Medium == "Sindhi" ? "Sindhi" : "Urdu", IsCompulsory = true, Code = "H-URD", MaxMarks = 100 });
+            currentSubjects.Add(new SubjectSchemeItem { Name = selectedEnrollment?.Religion == "Muslim" ? "Islamic Education" : "Civics", IsCompulsory = true, Code = "H-IED", MaxMarks = 50 });
+            currentSubjects.Add(new SubjectSchemeItem { Name = "Pakistan Studies", IsCompulsory = true, Code = "H-PST", MaxMarks = 50 });
+
+            if (grp.Contains("PRE-MED") || grp == "PRE-MEDICAL")
+            {
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Physics", IsCompulsory = false, Code = "H-PHY", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Chemistry", IsCompulsory = false, Code = "H-CHM", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Biology (Botany & Zoology)", IsCompulsory = false, Code = "H-BIO", MaxMarks = 100 });
+            }
+            else if (grp.Contains("PRE-ENG") || grp == "PRE-ENGINEERING")
+            {
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Physics", IsCompulsory = false, Code = "H-PHY", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Chemistry", IsCompulsory = false, Code = "H-CHM", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Mathematics", IsCompulsory = false, Code = "H-MTH", MaxMarks = 100 });
+            }
+            else if (grp.Contains("COMMERCE"))
+            {
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Principles of Accounting", IsCompulsory = false, Code = "H-ACC", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Principles of Commerce", IsCompulsory = false, Code = "H-POC", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Commercial Geography", IsCompulsory = false, Code = "H-CG", MaxMarks = 100 });
+            }
+            else // Humanities
+            {
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Civics / Sociology", IsCompulsory = false, Code = "H-CIV", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Economics / Education", IsCompulsory = false, Code = "H-ECO", MaxMarks = 100 });
+                currentSubjects.Add(new SubjectSchemeItem { Name = "Islamic History", IsCompulsory = false, Code = "H-ISH", MaxMarks = 100 });
+            }
+        }
+    }
+
+    private async Task SubmitExamForm()
+    {
+        if (selectedEnrollment == null) return;
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            examForm.SubjectsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Subjects = currentSubjects.Select(s => new { s.Name, s.IsCompulsory, s.Code, s.MaxMarks })
+            });
+
+            await ExamService.SaveExaminationFormAsync(examForm, true);
+            _isDirty = false;
+            ToastService.ShowSuccess($"Examination form for candidate '{selectedEnrollment.StudentName}' ({selectedEnrollment.EnrollmentNumber}) submitted successfully!", "Exam Form Submitted", 7000);
+            Navigation.NavigateTo("school/examinations");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            ToastService.ShowError(ex.Message, "Submission Error", 7000);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

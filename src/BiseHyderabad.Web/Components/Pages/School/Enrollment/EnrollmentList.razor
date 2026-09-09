@@ -1,0 +1,386 @@
+@page "/school/enrollments"
+@attribute [Authorize(Roles = "SchoolAdmin")]
+@inject IEnrollmentService EnrollmentService
+@inject IWindowService WindowService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject ILogger<EnrollmentList> Logger
+
+<!-- Challan Dialog -->
+<ChallanDialog IsVisible="@showChallanDialog" ChallanType="enrollment" OnClose="() => showChallanDialog = false" OnChallanGenerated="OnChallanGenerated" />
+
+<!-- Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+        <MudText Typo="Typo.h5" Style="text-transform: uppercase;">Enrollment List</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Candidate registration records, GR numbers, and official board cards</MudText>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" OnClick="() => showChallanDialog = true"
+                   StartIcon="@Icons.Material.Filled.Receipt">Generate Challan</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href="school/enrollments/create"
+                   StartIcon="@Icons.Material.Filled.Add">Add Enrollment</MudButton>
+    </div>
+</div>
+
+@if (_hasError)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>@_errorMessage</span>
+            <MudButton Color="Color.Inherit" Variant="Variant.Outlined" Size="Size.Small" OnClick="RetryLoad">Retry</MudButton>
+        </div>
+    </MudAlert>
+}
+else
+{
+    <!-- KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem;" class="mb-4 kpi-grid-container">
+        <KpiCard Title="Total Enrolled"
+                 Value="@(metrics?.TotalEnrolled.ToString() ?? "0")"
+                 Subtitle="@($"SSC: {metrics?.SscCount ?? 0} | HSC: {metrics?.HscCount ?? 0}")"
+                 BadgeText="TOTAL"
+                 Variant="blue"
+                 IsLoading="@isLoadingMetrics" />
+
+        <KpiCard Title="Reg # Allotted"
+                 Value="@(metrics?.AllottedCount.ToString() ?? "0")"
+                 Subtitle="Verified by Board"
+                 BadgeText="VERIFIED"
+                 Variant="emerald"
+                 IsLoading="@isLoadingMetrics" />
+
+        <KpiCard Title="Challaned (Pending)"
+                 Value="@(metrics?.ChallanedPendingCount.ToString() ?? "0")"
+                 Subtitle="Awaiting Bank Deposit"
+                 BadgeText="PENDING"
+                 Variant="amber"
+                 IsLoading="@isLoadingMetrics" />
+
+        <KpiCard Title="Remaining"
+                 Value="@(metrics?.UnInvoicedCount.ToString() ?? "0")"
+                 Subtitle="Ready for Challan"
+                 BadgeText="UNBILLED"
+                 Variant="purple"
+                 IsLoading="@isLoadingMetrics" />
+    </div>
+
+    <!-- Filters -->
+    <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="5">
+                <MudTextField T="string" @bind-Value="searchTerm" Placeholder="Search name, father, GR No, CNIC, enrollment #..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              DebounceInterval="400" OnDebounceIntervalElapsed="OnSearchChanged" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" Value="@selectedClass" Label="Class" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ValueChanged="@(async (string v) => { selectedClass = v; await OnFilterChanged(v); })">
+                    <MudSelectItem T="string" Value="@("")">All Classes</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("SSC-I")">SSC-I</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("SSC-II")">SSC-II</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HSC-I")">HSC-I</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HSC-II")">HSC-II</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="string" Value="@selectedGroup" Label="Group" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ValueChanged="@(async (string v) => { selectedGroup = v; await OnFilterChanged(v); })">
+                    <MudSelectItem T="string" Value="@("")">All Groups</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Science")">Science</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("General Regular")">General Regular</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Pre-Medical")">Pre-Medical</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Pre-Engineering")">Pre-Engineering</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Commerce")">Commerce</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Humanities")">Humanities</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- MudDataGrid Server-Side Pagination Table -->
+    <MudDataGrid T="Enrollment" ServerData="LoadServerData" @ref="_dataGrid"
+                 Dense="true" Hover="true" Striped="true" Bordered="true"
+                 Loading="@isLoadingData" RowsPerPage="25"
+                 SortMode="SortMode.Single" Filterable="false"
+                 Style="border-radius: 8px; overflow: hidden;">
+        <Columns>
+            <PropertyColumn Property="x => x.StudentName" Title="Candidate Name" Sortable="true" Style="min-width: 190px;">
+                <CellTemplate>
+                    <strong style="text-transform: uppercase; color: var(--mud-palette-text-primary);">@context.Item.StudentName</strong>
+                    @if (!string.IsNullOrEmpty(context.Item.Surname))
+                    {
+                        <span style="font-size: 0.72rem; color: var(--mud-palette-text-secondary); text-transform: uppercase;"> (@context.Item.Surname)</span>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.FatherName" Title="Father's Name" Style="min-width: 160px;">
+                <CellTemplate>
+                    <span style="text-transform: uppercase; color: var(--mud-palette-text-secondary);">@(context.Item.FatherName ?? "-")</span>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.GrNumber" Title="GR No" Sortable="true" Style="width: 120px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    @if (!string.IsNullOrEmpty(context.Item.GrNumber))
+                    {
+                        <MudTooltip Text="Click to copy GR #" Placement="Placement.Top">
+                            <span @onclick="@(() => CopyToClipboard(context.Item.GrNumber, "GR #"))"
+                                  @onclick:stopPropagation="true"
+                                  style="font-family: monospace; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.04); border: 1px dashed rgba(0,0,0,0.15);"
+                                  title="Click to copy">
+                                @context.Item.GrNumber
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.75rem; opacity: 0.65;" />
+                            </span>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Default">-</MudText>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.EnrollmentNumber" Title="Enrollment No" Sortable="true" Style="width: 185px; white-space: nowrap;">
+                <CellTemplate>
+                    @if (!string.IsNullOrEmpty(context.Item.EnrollmentNumber))
+                    {
+                        <MudTooltip Text="Click to copy Enrollment #" Placement="Placement.Top">
+                            <span @onclick="@(() => CopyToClipboard(context.Item.EnrollmentNumber, "Enrollment #"))"
+                                  @onclick:stopPropagation="true"
+                                  style="font-family: monospace; font-weight: 700; color: #047857; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 4px; background: rgba(5, 150, 105, 0.08); border: 1px solid rgba(5, 150, 105, 0.25);"
+                                  title="Click to copy">
+                                @context.Item.EnrollmentNumber
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.85rem; opacity: 0.75;" />
+                            </span>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Pending</MudChip>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.ClassLevel" Title="Class" Style="width: 95px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+                <CellTemplate>
+                    <strong>@context.Item.ClassLevel</strong>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Group" Title="Group" Style="width: 145px; white-space: nowrap;">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@context.Item.Group</MudChip>
+                </CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn Title="Actions" StickyRight="true" Sortable="false" Style="width: 175px; text-align: right; white-space: nowrap;" HeaderStyle="text-align: right;">
+                <CellTemplate>
+                    <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="@($"school/enrollments/{context.Item.Id}/edit")">Edit</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="() => PromptDelete(context.Item)">Delete</MudButton>
+                        @if (!string.IsNullOrEmpty(context.Item.EnrollmentNumber))
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Href="@($"api/pdf/enrollment-card/{context.Item.Id}")" Target="_blank">Card</MudButton>
+                        }
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-4">
+                No matching candidates found. Clear filters or register a new enrollment.
+            </MudAlert>
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">Loading candidates...</MudText>
+        </LoadingContent>
+        <PagerContent>
+            <MudDataGridPager T="Enrollment" PageSizeOptions="new[] { 10, 25, 50, 100 }" />
+        </PagerContent>
+    </MudDataGrid>
+}
+
+@code {
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
+    private MudDataGrid<Enrollment>? _dataGrid;
+    private EnrollmentMetricsDto? metrics;
+
+    private string searchTerm = "";
+    private string selectedClass = "";
+    private string selectedGroup = "";
+    private int? activeAcademicYearId;
+
+    private bool isLoadingData = true;
+    private bool isLoadingMetrics = true;
+    private bool showChallanDialog = false;
+    private bool _hasError = false;
+    private string _errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMetrics();
+    }
+
+    private async Task RetryLoad()
+    {
+        _hasError = false;
+        _errorMessage = "";
+        await LoadMetrics();
+        if (_dataGrid != null)
+        {
+            await _dataGrid.ReloadServerData();
+        }
+    }
+
+    private async Task CopyToClipboard(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add($"Copied {label}: {text}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Clipboard copy error.");
+        }
+    }
+
+    private async Task<GridData<Enrollment>> LoadServerData(GridState<Enrollment> state, CancellationToken cancellationToken)
+    {
+        await _dbLock.WaitAsync(cancellationToken);
+        try
+        {
+            isLoadingData = true;
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+
+            var pagedRequest = new PagedRequest
+            {
+                PageNumber = state.Page + 1,
+                PageSize = state.PageSize,
+                SearchTerm = searchTerm,
+            };
+
+            if (activeAcademicYearId.HasValue)
+            {
+                pagedRequest.Filters["academicYearId"] = activeAcademicYearId.Value.ToString();
+            }
+
+            if (state.SortDefinitions.Any())
+            {
+                var sort = state.SortDefinitions.First();
+                pagedRequest.SortBy = sort.SortBy;
+                pagedRequest.SortDescending = sort.Descending;
+            }
+
+            pagedRequest.Filters.Clear();
+            if (activeAcademicYearId.HasValue)
+                pagedRequest.Filters["academicYearId"] = activeAcademicYearId.Value.ToString();
+            if (!string.IsNullOrWhiteSpace(selectedClass))
+                pagedRequest.Filters["classLevel"] = selectedClass;
+            if (!string.IsNullOrWhiteSpace(selectedGroup))
+                pagedRequest.Filters["group"] = selectedGroup;
+
+            var result = await EnrollmentService.GetPagedEnrollmentsAsync(schoolId, pagedRequest);
+
+            return new GridData<Enrollment>
+            {
+                Items = result.Items,
+                TotalItems = result.TotalCount,
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load enrollment server data in EnrollmentList.");
+            _hasError = true;
+            _errorMessage = "Could not load enrollment data. Please try again.";
+            StateHasChanged();
+            return new GridData<Enrollment> { Items = [], TotalItems = 0 };
+        }
+        finally
+        {
+            isLoadingData = false;
+            _dbLock.Release();
+        }
+    }
+
+    private async Task LoadMetrics()
+    {
+        await _dbLock.WaitAsync();
+        try
+        {
+            isLoadingMetrics = true;
+            if (!activeAcademicYearId.HasValue)
+            {
+                var activeYear = await WindowService.GetActiveAcademicYearAsync();
+                activeAcademicYearId = activeYear?.Id;
+            }
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+            metrics = await EnrollmentService.GetEnrollmentMetricsAsync(schoolId, activeAcademicYearId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load enrollment metrics in EnrollmentList.");
+            _hasError = true;
+            _errorMessage = "Could not load enrollment data. Please try again.";
+        }
+        finally
+        {
+            isLoadingMetrics = false;
+            _dbLock.Release();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        searchTerm = value;
+        if (_dataGrid != null)
+            await _dataGrid.ReloadServerData();
+    }
+
+    private async Task OnFilterChanged(string value)
+    {
+        if (_dataGrid != null)
+            await _dataGrid.ReloadServerData();
+    }
+
+    private void OnChallanGenerated()
+    {
+        showChallanDialog = false;
+        _ = _dataGrid?.ReloadServerData();
+        _ = LoadMetrics();
+    }
+
+    private async Task PromptDelete(Enrollment e)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Are you sure you want to delete the enrollment record for '{e.StudentName}' (Father: {e.FatherName})? This action cannot be undone." },
+            { x => x.ButtonText, "Delete Record" },
+            { x => x.Color, Color.Error }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Candidate Deletion", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            var session = AuthStateProvider.CurrentUserSession;
+            int schoolId = session?.SchoolId ?? 1;
+            var success = await EnrollmentService.DeleteEnrollmentAsync(e.Id, schoolId);
+            if (success)
+            {
+                Snackbar.Add($"Candidate '{e.StudentName}' deleted successfully.", Severity.Success);
+                if (_dataGrid != null) await _dataGrid.ReloadServerData();
+                await LoadMetrics();
+            }
+            else
+            {
+                Snackbar.Add("Cannot delete candidate with active invoice or verified registration.", Severity.Error);
+            }
+        }
+    }
+}

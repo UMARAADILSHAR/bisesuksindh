@@ -1,0 +1,143 @@
+@page "/district/dashboard"
+@attribute [Authorize(Roles = "DistrictAdmin")]
+@inject ISchoolService SchoolService
+@inject IReportService ReportService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">
+            District Monitoring Dashboard (@districtName)
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">
+            Affiliated schools overview, student registration metrics, and revenue reconciliation for @districtName District
+        </p>
+    </div>
+    <a href="superadmin/reports" class="btn btn-secondary btn-sm">
+        📈 View District Analytics
+    </a>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-icon blue">🏫</div>
+        <div class="kpi-data">
+            <div class="kpi-label">District Schools</div>
+            <div class="kpi-value">@districtSchools.Count</div>
+            <div class="kpi-subtext">Public & Private High Schools</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon green">📋</div>
+        <div class="kpi-data">
+            <div class="kpi-label">Enrolled Students</div>
+            <div class="kpi-value">@totalEnrolled</div>
+            <div class="kpi-subtext">Across All Levels</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon purple">🎓</div>
+        <div class="kpi-data">
+            <div class="kpi-label">Exam Candidates</div>
+            <div class="kpi-value">@totalExams</div>
+            <div class="kpi-subtext">Forms Submitted</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon amber">💰</div>
+        <div class="kpi-data">
+            <div class="kpi-label">Total Fees Collected</div>
+            <div class="kpi-value">Rs. @totalFees.ToString("N0")</div>
+            <div class="kpi-subtext">Verified Invoices</div>
+        </div>
+    </div>
+</div>
+
+<div class="card-surface">
+    <div class="card-header-flex">
+        <div class="card-header-title">
+            <span>🏫</span> Schools in @districtName District
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>SEMIS Code</th>
+                    <th>Code</th>
+                    <th>School Name</th>
+                    <th>Tehsil</th>
+                    <th>Type</th>
+                    <th>Zone</th>
+                    <th>Head Master / Phone</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!districtSchools.Any())
+                {
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No schools found for this district.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var s in districtSchools)
+                    {
+                        <tr>
+                            <td><strong>@s.SemisCode</strong></td>
+                            <td><span class="badge badge-secondary">@(s.Code ?? s.Id.ToString("D3"))</span></td>
+                            <td><strong>@s.Name</strong></td>
+                            <td>@(s.Tehsil?.Name ?? "-")</td>
+                            <td>
+                                <span class="badge @(s.Type == SchoolType.Public ? "badge-info" : "badge-warning")">
+                                    @s.Type
+                                </span>
+                            </td>
+                            <td>Zone @s.Zone</td>
+                            <td>@(s.HeadName ?? "-") (@(s.HeadPhone ?? "-"))</td>
+                            <td>
+                                <span class="badge @(s.IsActive ? "badge-success" : "badge-secondary")">
+                                    @(s.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private string districtName = "Hyderabad";
+    private int districtId = 1;
+    private List<School> districtSchools = new();
+    private int totalEnrolled = 0;
+    private int totalExams = 0;
+    private decimal totalFees = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var session = AuthStateProvider.CurrentUserSession;
+        if (session != null && session.DistrictId.HasValue)
+        {
+            districtId = session.DistrictId.Value;
+            districtName = session.DistrictName ?? "Hyderabad";
+        }
+
+        districtSchools = await SchoolService.GetAllSchoolsAsync(districtId);
+        var breakdown = await ReportService.GetDistrictBreakdownAsync();
+        var myDist = breakdown.FirstOrDefault(d => d.DistrictId == districtId);
+        if (myDist != null)
+        {
+            totalEnrolled = myDist.EnrollmentCount;
+            totalExams = myDist.ExamCount;
+            totalFees = myDist.TotalFeesCollected;
+        }
+    }
+}

@@ -1,0 +1,108 @@
+name: BISE Hyderabad CI/CD
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: bise-hyderabad
+  ECS_CLUSTER: bise-hyderabad-production
+  ECS_SERVICE: bise-hyderabad-production-svc
+
+permissions:
+  id-token: write    # Required for OIDC
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, Test & Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore NuGet Packages
+      run: dotnet restore BiseHyderabad.slnx
+
+    - name: Build Solution (Release)
+      run: dotnet build BiseHyderabad.slnx --configuration Release --no-restore
+
+    - name: Run Test Suite
+      run: dotnet test BiseHyderabad.slnx --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+    - name: Vulnerability Package Audit
+      run: dotnet list package --vulnerable --include-transitive
+
+  deploy:
+    name: Build Image & Deploy to AWS ECS
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials (OIDC)
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/bise-hyderabad-github-actions-role
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: ecr-login
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, Tag & Push Docker Image
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Download Current Task Definition
+      run: |
+        aws ecs describe-task-definition \
+          --task-definition bise-hyderabad-production \
+          --query 'taskDefinition' \
+          --output json > task-definition.json
+
+    - name: Update ECS Task Definition with New Image
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: bise-hyderabad-web
+        image: ${{ steps.build-image.outputs.image }}
+
+    - name: Ensure ECS Service is Active (Desired Count >= 1)
+      run: |
+        aws ecs update-service \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --service ${{ env.ECS_SERVICE }} \
+          --desired-count 1
+
+    - name: Deploy to Amazon ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+        wait-for-minutes: 10
+
+

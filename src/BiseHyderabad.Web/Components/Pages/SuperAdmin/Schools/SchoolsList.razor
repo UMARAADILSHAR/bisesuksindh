@@ -1,0 +1,298 @@
+@page "/superadmin/schools"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ISchoolService SchoolService
+@inject IJSRuntime JSRuntime
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Registered Schools Management</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage SEMIS codes, school zones, allowed classes (SSC/HSC), and administration credentials</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="OpenAddSchoolModal">
+            ➕ Register New School
+        </button>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card-surface" style="padding: 1rem 1.25rem;">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        <div style="flex: 1; min-width: 250px;">
+            <input type="text" class="form-control" placeholder="Search by name, SEMIS code, or school code..." @bind="searchTerm" @bind:event="oninput" @bind:after="FilterSchools" />
+        </div>
+        <div style="width: 200px;">
+            <select class="form-select" @bind="selectedDistrictId" @bind:after="FilterSchools">
+                <option value="">All Districts</option>
+                @foreach (var d in districts)
+                {
+                    <option value="@d.Id">@d.Name (@d.ShortCode)</option>
+                }
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Schools Table -->
+<div class="card-surface">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>SEMIS Code</th>
+                    <th>Code</th>
+                    <th>School Name</th>
+                    <th>District / Tehsil</th>
+                    <th>Type</th>
+                    <th>Zone</th>
+                    <th>Allowed Levels</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!filteredSchools.Any())
+                {
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No schools found matching your search criteria.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var s in filteredSchools)
+                    {
+                        <tr>
+                            <td><strong>@s.SemisCode</strong></td>
+                            <td><span class="badge badge-secondary">@(s.Code ?? s.Id.ToString("D3"))</span></td>
+                            <td>
+                                <div><strong>@s.Name</strong></div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">Head: @(s.HeadName ?? "Not assigned") (@(s.HeadPhone ?? "-"))</div>
+                            </td>
+                            <td>
+                                <div>@(s.District?.Name ?? "-")</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">@(s.Tehsil?.Name ?? "-")</div>
+                            </td>
+                            <td>
+                                <span class="badge @(s.Type == SchoolType.Public ? "badge-info" : "badge-warning")">
+                                    @s.Type
+                                </span>
+                            </td>
+                            <td>Zone @s.Zone</td>
+                            <td>
+                                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                                    @if (s.AllowedLevelsJson.Contains("SSC-I")) { <span class="badge badge-secondary">SSC-I</span> }
+                                    @if (s.AllowedLevelsJson.Contains("SSC-II")) { <span class="badge badge-secondary">SSC-II</span> }
+                                    @if (s.AllowedLevelsJson.Contains("HSC-I")) { <span class="badge badge-secondary">HSC-I</span> }
+                                    @if (s.AllowedLevelsJson.Contains("HSC-II")) { <span class="badge badge-secondary">HSC-II</span> }
+                                </div>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm @(s.IsActive ? "btn-success" : "btn-secondary")" @onclick="() => ToggleSchool(s.Id)">
+                                    @(s.IsActive ? "Active" : "Inactive")
+                                </button>
+                            </td>
+                            <td style="text-align: right;">
+                                <button type="button" class="btn btn-secondary btn-sm" @onclick="() => EditSchool(s)">
+                                    ✏️ Edit
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- School Add/Edit Modal -->
+@if (showModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700;">@(editingSchool.Id == 0 ? "Register New School" : "Edit School Details")</h3>
+                <button type="button" @onclick="CloseModal" style="background: none; border: none; font-size: 1.4rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <EditForm Model="editingSchool" OnValidSubmit="SaveSchool">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">SEMIS Code (9 Digits)</label>
+                            <input type="text" class="form-control" @bind="editingSchool.SemisCode" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">School Short Code (e.g. 001)</label>
+                            <input type="text" class="form-control" @bind="editingSchool.Code" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">School Full Name</label>
+                        <input type="text" class="form-control" @bind="editingSchool.Name" required />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">District</label>
+                            <select class="form-select" @bind="editingSchool.DistrictId" @bind:after="OnDistrictChanged" required>
+                                <option value="0">-- Select District --</option>
+                                @foreach (var d in districts)
+                                {
+                                    <option value="@d.Id">@d.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tehsil</label>
+                            <select class="form-select" @bind="editingSchool.TehsilId">
+                                <option value="">-- Select Tehsil --</option>
+                                @foreach (var t in tehsilsForSelectedDistrict)
+                                {
+                                    <option value="@t.Id">@t.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">School Type</label>
+                            <select class="form-select" @bind="editingSchool.Type">
+                                <option value="@SchoolType.Public">Public / Govt</option>
+                                <option value="@SchoolType.Private">Private / Model</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Zone</label>
+                            <input type="number" class="form-control" @bind="editingSchool.Zone" min="1" max="5" />
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Head Master / Principal Name</label>
+                            <input type="text" class="form-control" @bind="editingSchool.HeadName" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Head Mobile / Contact Number</label>
+                            <input type="text" class="form-control" @bind="editingSchool.HeadPhone" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer-custom" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save School</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<ToastNotification Message="@toastMessage" Type="@toastType" OnClose="() => toastMessage = null" />
+
+@code {
+    private List<School> schools = new();
+    private List<School> filteredSchools = new();
+    private List<District> districts = new();
+    private List<Tehsil> tehsilsForSelectedDistrict = new();
+    private string searchTerm = "";
+    private int? selectedDistrictId;
+
+    private bool showModal = false;
+    private School editingSchool = new();
+    private string? toastMessage;
+    private string toastType = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        districts = await SchoolService.GetAllDistrictsAsync();
+        await LoadSchools();
+    }
+
+    private async Task LoadSchools()
+    {
+        schools = await SchoolService.GetAllSchoolsAsync();
+        FilterSchools();
+    }
+
+    private void FilterSchools()
+    {
+        filteredSchools = schools.Where(s =>
+            (string.IsNullOrWhiteSpace(searchTerm) || s.Name.ToLower().Contains(searchTerm.ToLower()) || s.SemisCode.Contains(searchTerm) || (s.Code != null && s.Code.Contains(searchTerm))) &&
+            (!selectedDistrictId.HasValue || s.DistrictId == selectedDistrictId.Value)
+        ).ToList();
+    }
+
+    private void OpenAddSchoolModal()
+    {
+        editingSchool = new School { Type = SchoolType.Public, Zone = 1 };
+        if (districts.Any()) editingSchool.DistrictId = districts.First().Id;
+        OnDistrictChanged();
+        showModal = true;
+    }
+
+    private void EditSchool(School school)
+    {
+        editingSchool = new School
+        {
+            Id = school.Id,
+            SemisCode = school.SemisCode,
+            Code = school.Code,
+            Name = school.Name,
+            DistrictId = school.DistrictId,
+            TehsilId = school.TehsilId,
+            Type = school.Type,
+            Zone = school.Zone,
+            Address = school.Address,
+            ContactNumber = school.ContactNumber,
+            HeadName = school.HeadName,
+            HeadPhone = school.HeadPhone,
+            HeadCnic = school.HeadCnic,
+            HeadEmail = school.HeadEmail,
+            AllowedLevelsJson = school.AllowedLevelsJson,
+            IsActive = school.IsActive
+        };
+        OnDistrictChanged();
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+    }
+
+    private async void OnDistrictChanged()
+    {
+        if (editingSchool.DistrictId > 0)
+        {
+            tehsilsForSelectedDistrict = await SchoolService.GetTehsilsByDistrictAsync(editingSchool.DistrictId);
+            if (!tehsilsForSelectedDistrict.Any(t => t.Id == editingSchool.TehsilId))
+            {
+                editingSchool.TehsilId = tehsilsForSelectedDistrict.FirstOrDefault()?.Id;
+            }
+        }
+        else
+        {
+            tehsilsForSelectedDistrict.Clear();
+        }
+        StateHasChanged();
+    }
+
+    private async Task SaveSchool()
+    {
+        await SchoolService.SaveSchoolAsync(editingSchool);
+        toastMessage = $"School '{editingSchool.Name}' saved successfully.";
+        toastType = "success";
+        showModal = false;
+        await LoadSchools();
+    }
+
+    private async Task ToggleSchool(int schoolId)
+    {
+        await SchoolService.ToggleSchoolStatusAsync(schoolId);
+        toastMessage = "School status updated.";
+        toastType = "info";
+        await LoadSchools();
+    }
+}

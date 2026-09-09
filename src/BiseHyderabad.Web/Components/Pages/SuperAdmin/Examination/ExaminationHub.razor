@@ -1,0 +1,360 @@
+@page "/superadmin/examination-hub"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IExaminationService ExamService
+@inject IWindowService WindowService
+@inject ISchoolService SchoolService
+@inject ICertificateService CertificateService
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Examination Operations Hub</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage centers, timetable schedules, automatic roll number allotter, marks entry, and certificate issuance</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button type="button" class="btn btn-primary btn-sm" @onclick="OpenAddScheduleModal">
+            ➕ Add Timetable Paper
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" @onclick="OpenAddCenterModal">
+            🏢 Create Exam Center
+        </button>
+    </div>
+</div>
+
+<!-- Allotment Runner Banner -->
+<div class="card-surface" style="border: 1px solid var(--border-subtle);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-primary);">⚡ Automated Roll Number Allotment Engine</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Run sequential seat & roll number allotment for all verified examination candidates.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <select class="form-select" @bind="selectedAllotmentClass" style="width: 140px;">
+                <option value="SSC-I">SSC-I (9th)</option>
+                <option value="SSC-II">SSC-II (10th)</option>
+                <option value="HSC-I">HSC-I (11th)</option>
+                <option value="HSC-II">HSC-II (12th)</option>
+            </select>
+            <button type="button" class="btn btn-success" @onclick="RunAllotment">
+                🚀 Run Allotment Sequence
+            </button>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Exam Centers List -->
+    <div class="card-surface">
+        <div class="card-header-flex">
+            <div class="card-header-title">
+                <span>🏢</span> Designated Examination Centers
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Center Code</th>
+                        <th>Name</th>
+                        <th>District</th>
+                        <th>Capacity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!centers.Any())
+                    {
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No exam centers configured.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var c in centers)
+                        {
+                            <tr>
+                                <td><span class="badge badge-info">@c.CenterCode</span></td>
+                                <td>
+                                    <div><strong>@c.Name</strong></div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Supdt: @(c.SuperintendentName ?? "Not assigned")</div>
+                                </td>
+                                <td>@(c.District?.Name ?? "-")</td>
+                                <td>@c.Capacity Candidates</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Exam Timetable Schedule -->
+    <div class="card-surface">
+        <div class="card-header-flex">
+            <div class="card-header-title">
+                <span>📅</span> Examination Schedule Timetable
+            </div>
+            <div>
+                <select class="form-select form-select-sm" @bind="filterClassSchedule" @bind:after="LoadSchedules" style="width: 120px;">
+                    <option value="">All Classes</option>
+                    <option value="SSC-I">SSC-I</option>
+                    <option value="SSC-II">SSC-II</option>
+                    <option value="HSC-I">HSC-I</option>
+                    <option value="HSC-II">HSC-II</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Class</th>
+                        <th>Subject</th>
+                        <th>Session</th>
+                        <th style="text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!schedules.Any())
+                    {
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No exam papers scheduled.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var s in schedules)
+                        {
+                            <tr>
+                                <td><strong>@s.ExamDate.ToString("yyyy-MM-dd")</strong></td>
+                                <td><span class="badge badge-secondary">@s.ClassLevel</span></td>
+                                <td>@s.SubjectName</td>
+                                <td><span class="badge @(s.Session == "Morning" ? "badge-info" : "badge-warning")">@s.Session</span></td>
+                                <td style="text-align: right;">
+                                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => DeleteSchedule(s.Id)">
+                                        🗑️
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Center Modal -->
+@if (showCenterModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700;">Create Examination Center</h3>
+                <button type="button" @onclick="() => showCenterModal = false" style="background: none; border: none; font-size: 1.4rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <EditForm Model="newCenter" OnValidSubmit="SaveCenter">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Center Code (e.g. CTR-HYD-02)</label>
+                            <input type="text" class="form-control" @bind="newCenter.CenterCode" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">District</label>
+                            <select class="form-select" @bind="newCenter.DistrictId" required>
+                                @foreach (var d in districts)
+                                {
+                                    <option value="@d.Id">@d.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Center Facility Name</label>
+                        <input type="text" class="form-control" @bind="newCenter.Name" required />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Superintendent Name</label>
+                            <input type="text" class="form-control" @bind="newCenter.SuperintendentName" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Capacity (Candidates)</label>
+                            <input type="number" class="form-control" @bind="newCenter.Capacity" min="50" max="2000" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer-custom" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" @onclick="() => showCenterModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Exam Center</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Timetable Modal -->
+@if (showScheduleModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700;">Schedule Examination Paper</h3>
+                <button type="button" @onclick="() => showScheduleModal = false" style="background: none; border: none; font-size: 1.4rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <EditForm Model="newSchedule" OnValidSubmit="SaveSchedule">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Class Level</label>
+                            <select class="form-select" @bind="newSchedule.ClassLevel">
+                                <option value="SSC-I">SSC-I (9th)</option>
+                                <option value="SSC-II">SSC-II (10th)</option>
+                                <option value="HSC-I">HSC-I (11th)</option>
+                                <option value="HSC-II">HSC-II (12th)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Group</label>
+                            <input type="text" class="form-control" @bind="newSchedule.Group" required />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Subject Name</label>
+                        <input type="text" class="form-control" @bind="newSchedule.SubjectName" placeholder="e.g. PHYSICS-I" required />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Paper Date</label>
+                            <input type="date" class="form-control" @bind="newSchedule.ExamDate" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Session</label>
+                            <select class="form-select" @bind="newSchedule.Session">
+                                <option value="Morning">Morning (9:00 AM - 12:00 PM)</option>
+                                <option value="Evening">Evening (2:00 PM - 5:00 PM)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer-custom" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" @onclick="() => showScheduleModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add to Timetable</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<ToastNotification Message="@toastMessage" Type="@toastType" OnClose="() => toastMessage = null" />
+
+@code {
+    private AcademicYear? activeYear;
+    private List<ExamCenter> centers = new();
+    private List<ExamSchedule> schedules = new();
+    private List<District> districts = new();
+
+    private string selectedAllotmentClass = "SSC-I";
+    private string filterClassSchedule = "";
+
+    private bool showCenterModal = false;
+    private ExamCenter newCenter = new();
+
+    private bool showScheduleModal = false;
+    private ExamSchedule newSchedule = new();
+
+    private string? toastMessage;
+    private string toastType = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        activeYear = await WindowService.GetActiveAcademicYearAsync();
+        districts = await SchoolService.GetAllDistrictsAsync();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        centers = await ExamService.GetExamCentersAsync();
+        await LoadSchedules();
+    }
+
+    private async Task LoadSchedules()
+    {
+        if (activeYear != null)
+        {
+            schedules = await ExamService.GetExamSchedulesAsync(activeYear.Id, string.IsNullOrWhiteSpace(filterClassSchedule) ? null : filterClassSchedule);
+        }
+    }
+
+    private async Task RunAllotment()
+    {
+        if (activeYear == null) return;
+        var count = await ExamService.RunRollNumberAllotmentAsync(activeYear.Id, selectedAllotmentClass);
+        if (count > 0)
+        {
+            toastMessage = $"Successfully allotted roll numbers to {count} candidates for {selectedAllotmentClass}!";
+            toastType = "success";
+        }
+        else
+        {
+            toastMessage = $"No un-allotted verified candidates found for {selectedAllotmentClass}.";
+            toastType = "info";
+        }
+    }
+
+    private void OpenAddCenterModal()
+    {
+        newCenter = new ExamCenter { Capacity = 500, DistrictId = districts.FirstOrDefault()?.Id ?? 1 };
+        showCenterModal = true;
+    }
+
+    private async Task SaveCenter()
+    {
+        await ExamService.SaveExamCenterAsync(newCenter);
+        toastMessage = $"Exam Center '{newCenter.Name}' saved.";
+        toastType = "success";
+        showCenterModal = false;
+        await LoadData();
+    }
+
+    private void OpenAddScheduleModal()
+    {
+        newSchedule = new ExamSchedule
+        {
+            AcademicYearId = activeYear?.Id ?? 1,
+            ClassLevel = "SSC-I",
+            Group = "Science",
+            ExamDate = DateTime.UtcNow.AddDays(30),
+            Session = "Morning"
+        };
+        showScheduleModal = true;
+    }
+
+    private async Task SaveSchedule()
+    {
+        await ExamService.SaveExamScheduleAsync(newSchedule);
+        toastMessage = "Schedule entry saved.";
+        toastType = "success";
+        showScheduleModal = false;
+        await LoadSchedules();
+    }
+
+    private async Task DeleteSchedule(int id)
+    {
+        await ExamService.DeleteExamScheduleAsync(id);
+        toastMessage = "Schedule paper deleted.";
+        toastType = "info";
+        await LoadSchedules();
+    }
+}

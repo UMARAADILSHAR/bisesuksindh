@@ -1,0 +1,272 @@
+@page "/superadmin/users"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IUserService UserService
+@inject ISchoolService SchoolService
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">User Accounts & Roles Management</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage SuperAdmin operators, District Monitoring officers, and School Principals/Admins</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="OpenAddUserModal">
+            ➕ Create User Account
+        </button>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card-surface" style="padding: 1rem 1.25rem;">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        <div style="flex: 1; min-width: 250px;">
+            <input type="text" class="form-control" placeholder="Search by username, full name, or email..." @bind="searchTerm" @bind:event="oninput" @bind:after="FilterUsers" />
+        </div>
+        <div style="width: 200px;">
+            <select class="form-select" @bind="selectedRole" @bind:after="FilterUsers">
+                <option value="">All Roles</option>
+                <option value="@UserRole.SuperAdmin">Super Admin</option>
+                <option value="@UserRole.DistrictAdmin">District Admin</option>
+                <option value="@UserRole.SchoolAdmin">School Admin</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="card-surface">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Assigned School / District</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!filteredUsers.Any())
+                {
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No user accounts found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var u in filteredUsers)
+                    {
+                        <tr>
+                            <td><strong>@u.Username</strong></td>
+                            <td>@u.Name</td>
+                            <td>@(u.Email ?? "-")</td>
+                            <td>
+                                <span class="badge @(u.Role == UserRole.SuperAdmin ? "badge-danger" : u.Role == UserRole.DistrictAdmin ? "badge-info" : "badge-success")">
+                                    @u.Role
+                                </span>
+                            </td>
+                            <td>
+                                @if (u.School != null)
+                                {
+                                    <span>🏫 @u.School.Name</span>
+                                }
+                                else if (u.District != null)
+                                {
+                                    <span>🗺️ @u.District.Name District</span>
+                                }
+                                else
+                                {
+                                    <span style="color: var(--text-muted);">Board Wide</span>
+                                }
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm @(u.IsActive ? "btn-success" : "btn-secondary")" @onclick="() => ToggleStatus(u.Id)">
+                                    @(u.IsActive ? "Active" : "Disabled")
+                                </button>
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 0.5rem;">
+                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => PromptResetPassword(u)">
+                                        🔑 Reset Pass
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => EditUser(u)">
+                                        ✏️ Edit
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit User Modal -->
+@if (showModal)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-dialog-custom">
+            <div class="modal-header-custom">
+                <h3 style="font-size: 1.15rem; font-weight: 700;">@(editingUser.Id == 0 ? "Create User Account" : "Edit User Account")</h3>
+                <button type="button" @onclick="() => showModal = false" style="background: none; border: none; font-size: 1.4rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body-custom">
+                <EditForm Model="editingUser" OnValidSubmit="SaveUser">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" @bind="editingUser.Username" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Password @(editingUser.Id > 0 ? "(Leave blank to keep existing)" : "(Required)")</label>
+                            <input type="text" class="form-control" @bind="plainPassword" placeholder="Enter secure password" />
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" class="form-control" @bind="editingUser.Name" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" @bind="editingUser.Email" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">User Role</label>
+                        <select class="form-select" @bind="editingUser.Role">
+                            <option value="@UserRole.SuperAdmin">Super Admin (Full Board Access)</option>
+                            <option value="@UserRole.DistrictAdmin">District Admin (District Monitoring)</option>
+                            <option value="@UserRole.SchoolAdmin">School Admin (Portal & Submissions)</option>
+                        </select>
+                    </div>
+
+                    @if (editingUser.Role == UserRole.SchoolAdmin)
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Assign to School</label>
+                            <select class="form-select" @bind="editingUser.SchoolId">
+                                <option value="">-- Select School --</option>
+                                @foreach (var s in schools)
+                                {
+                                    <option value="@s.Id">@s.Name (@s.SemisCode)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    else if (editingUser.Role == UserRole.DistrictAdmin)
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Assign to District</label>
+                            <select class="form-select" @bind="editingUser.DistrictId">
+                                <option value="">-- Select District --</option>
+                                @foreach (var d in districts)
+                                {
+                                    <option value="@d.Id">@d.Name (@d.ShortCode)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    <div class="modal-footer-custom" style="padding: 1rem 0 0 0; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" @onclick="() => showModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save User</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<ToastNotification Message="@toastMessage" Type="@toastType" OnClose="() => toastMessage = null" />
+
+@code {
+    private List<User> users = new();
+    private List<User> filteredUsers = new();
+    private List<School> schools = new();
+    private List<District> districts = new();
+
+    private string searchTerm = "";
+    private UserRole? selectedRole;
+    private bool showModal = false;
+    private User editingUser = new();
+    private string plainPassword = "";
+    private string? toastMessage;
+    private string toastType = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        schools = await SchoolService.GetAllSchoolsAsync();
+        districts = await SchoolService.GetAllDistrictsAsync();
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = await UserService.GetAllUsersAsync();
+        FilterUsers();
+    }
+
+    private void FilterUsers()
+    {
+        filteredUsers = users.Where(u =>
+            (string.IsNullOrWhiteSpace(searchTerm) || u.Username.ToLower().Contains(searchTerm.ToLower()) || u.Name.ToLower().Contains(searchTerm.ToLower()) || (u.Email != null && u.Email.ToLower().Contains(searchTerm.ToLower()))) &&
+            (!selectedRole.HasValue || u.Role == selectedRole.Value)
+        ).ToList();
+    }
+
+    private void OpenAddUserModal()
+    {
+        editingUser = new User { Role = UserRole.SchoolAdmin, IsActive = true, MustChangePassword = true };
+        plainPassword = BiseHyderabad.Core.Helpers.PasswordGenerator.GenerateTemporaryPassword(12);
+        showModal = true;
+    }
+
+    private void EditUser(User user)
+    {
+        editingUser = new User
+        {
+            Id = user.Id,
+            Username = user.Username,
+            Name = user.Name,
+            Email = user.Email,
+            Role = user.Role,
+            SchoolId = user.SchoolId,
+            DistrictId = user.DistrictId,
+            IsActive = user.IsActive,
+            MustChangePassword = user.MustChangePassword
+        };
+        plainPassword = "";
+        showModal = true;
+    }
+
+    private async Task SaveUser()
+    {
+        await UserService.SaveUserAsync(editingUser, string.IsNullOrWhiteSpace(plainPassword) ? null : plainPassword);
+        toastMessage = $"User '{editingUser.Username}' saved successfully.";
+        toastType = "success";
+        showModal = false;
+        await LoadUsers();
+    }
+
+    private async Task ToggleStatus(int userId)
+    {
+        await UserService.ToggleUserStatusAsync(userId);
+        toastMessage = "User status updated.";
+        toastType = "info";
+        await LoadUsers();
+    }
+
+    private async Task PromptResetPassword(User user)
+    {
+        var tempPassword = BiseHyderabad.Core.Helpers.PasswordGenerator.GenerateTemporaryPassword(12);
+        await UserService.ResetPasswordAsync(user.Id, tempPassword);
+        toastMessage = $"Password for '{user.Username}' reset to: '{tempPassword}'. User will be prompted to change it on next login.";
+        toastType = "warning";
+    }
+}

@@ -1,0 +1,113 @@
+@page "/superadmin/reports"
+@attribute [Authorize(Roles = "SuperAdmin,DistrictAdmin")]
+@inject IReportService ReportService
+@inject ISchoolService SchoolService
+@inject IJSRuntime JSRuntime
+
+<div class="card-header-flex">
+    <div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Board Comprehensive Reports</h2>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">Generate district summary analytics, institutional enrollment lists, and financial collection statements</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="PrintReport">
+            🖨️ Print / Export PDF
+        </button>
+    </div>
+</div>
+
+@if (stats == null)
+{
+    <p style="color: var(--text-muted); padding: 2rem;">Loading comprehensive reports data...</p>
+}
+else
+{
+    <!-- Report Summary Overview -->
+    <div class="card-surface">
+        <div class="card-header-flex">
+            <div class="card-header-title">
+                <span>📊</span> Executive Summary Overview
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">
+                Generated on: @DateTime.UtcNow.ToLocalTime().ToString("dd MMM yyyy, HH:mm")
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div style="background: var(--bg-app); padding: 1rem; border-radius: var(--radius-md);">
+                <div class="kpi-label">Affiliated Schools</div>
+                <div style="font-size: 1.5rem; font-weight: 800;">@stats.TotalSchools</div>
+            </div>
+            <div style="background: var(--bg-app); padding: 1rem; border-radius: var(--radius-md);">
+                <div class="kpi-label">Total Registrations</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af;">@stats.TotalEnrollments</div>
+            </div>
+            <div style="background: var(--bg-app); padding: 1rem; border-radius: var(--radius-md);">
+                <div class="kpi-label">Exam Candidates</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #6b21a8;">@stats.TotalExams</div>
+            </div>
+            <div style="background: var(--bg-app); padding: 1rem; border-radius: var(--radius-md);">
+                <div class="kpi-label">Revenue Collected</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #047857;">Rs. @stats.TotalRevenue.ToString("N0")</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- District Wise Statistics Table -->
+    <div class="card-surface">
+        <div class="card-header-flex">
+            <div class="card-header-title">
+                <span>🗺️</span> District Wise Detailed Statistical Statement
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>District Jurisdiction</th>
+                        <th>Short Code</th>
+                        <th>Registered Schools</th>
+                        <th>Total Enrolled</th>
+                        <th>Exam Submissions</th>
+                        <th>Exam Submission %</th>
+                        <th>Revenue Collected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in stats.DistrictBreakdown)
+                    {
+                        var pct = d.EnrollmentCount > 0 ? Math.Round((decimal)d.ExamCount / d.EnrollmentCount * 100, 1) : 0;
+                        <tr>
+                            <td><strong>@d.DistrictName</strong></td>
+                            <td><span class="badge badge-info">@d.ShortCode</span></td>
+                            <td>@d.SchoolCount</td>
+                            <td><strong>@d.EnrollmentCount</strong></td>
+                            <td><strong>@d.ExamCount</strong></td>
+                            <td>
+                                <span class="badge @(pct >= 80 ? "badge-success" : pct >= 50 ? "badge-warning" : "badge-secondary")">
+                                    @pct%
+                                </span>
+                            </td>
+                            <td style="font-weight: 700; color: #047857;">Rs. @d.TotalFeesCollected.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private SuperAdminStatsDto? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stats = await ReportService.GetSuperAdminStatsAsync();
+    }
+
+    private async Task PrintReport()
+    {
+        await JSRuntime.InvokeVoidAsync("biseApp.print");
+    }
+}

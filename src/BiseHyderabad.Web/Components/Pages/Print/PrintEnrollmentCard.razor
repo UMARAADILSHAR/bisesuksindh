@@ -1,0 +1,163 @@
+@page "/print/enrollment-card/{id:int}"
+@attribute [Authorize]
+@inject IEnrollmentService EnrollmentService
+@inject ICertificateService CertificateService
+@inject IJSRuntime JSRuntime
+
+@if (student == null)
+{
+    <p style="padding: 2rem;">Loading Student Registration Card...</p>
+}
+else
+{
+    <div class="no-print" style="padding: 1rem 2rem; background: #1e293b; color: white; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <strong style="font-size: 1.1rem;">Official Student Registration Card</strong>
+            <span style="font-size: 0.85rem; color: #94a3b8; margin-left: 1rem;">Registration #: @student.EnrollmentNumber</span>
+        </div>
+        <button type="button" class="btn btn-primary" @onclick="Print">
+            🖨️ Print Registration Card
+        </button>
+    </div>
+
+    <div class="print-page" style="display: flex; justify-content: center; padding: 20px; background: #f8fafc;">
+        <div style="width: 750px; border: 3px double #1e3a8a; border-radius: 12px; padding: 25px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; font-family: 'Times New Roman', Times, serif;">
+            <!-- Watermark text -->
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.04; font-size: 5rem; font-weight: 900; pointer-events: none; transform: rotate(-30deg);">
+                BISE HYDERABAD
+            </div>
+
+            <!-- Card Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; margin-bottom: 20px;">
+                <div style="width: 70px; height: 70px; background: linear-gradient(135deg, #1e3a8a, #0ea5e9); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold;">
+                    B
+                </div>
+                <div style="text-align: center; flex: 1;">
+                    <h2 style="font-size: 1.4rem; font-weight: bold; color: #1e3a8a; margin: 0; letter-spacing: 0.02em;">
+                        BOARD OF INTERMEDIATE & SECONDARY EDUCATION HYDERABAD
+                    </h2>
+                    <h3 style="font-size: 1.05rem; font-weight: bold; color: #333; margin: 4px 0 0 0;">
+                        STUDENT REGISTRATION / ENROLLMENT CARD
+                    </h3>
+                    <div style="font-size: 0.85rem; color: #666; font-style: italic;">
+                        Academic Session: @(student.AcademicYear?.YearName ?? "2026")
+                    </div>
+                </div>
+                <div style="width: 70px; text-align: right;">
+                    @if (!string.IsNullOrEmpty(qrBase64))
+                    {
+                        <img src="data:image/png;base64,@qrBase64" style="width: 65px; height: 65px;" />
+                    }
+                </div>
+            </div>
+
+            <!-- Card Content Body -->
+            <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 20px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 9.5pt; line-height: 1.8;">
+                    <tr>
+                        <td style="width: 160px; font-weight: bold; color: #555;">REGISTRATION NUMBER:</td>
+                        <td><strong style="font-size: 1.1rem; color: #1e3a8a; font-family: monospace; background: #e0f2fe; padding: 2px 8px; border-radius: 4px; border: 1px solid #7dd3fc;">@student.EnrollmentNumber</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; color: #555;">CANDIDATE NAME:</td>
+                        <td><strong style="font-size: 1.05rem; text-transform: uppercase;">@student.StudentName</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; color: #555;">FATHER'S NAME:</td>
+                        <td><strong style="text-transform: uppercase;">@(student.FatherName ?? "-")</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; color: #555;">CNIC / B-FORM:</td>
+                        <td><code>@student.Cnic</code></td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; color: #555;">DATE OF BIRTH / GENDER:</td>
+                        <td>@student.DateOfBirth.ToString("dd MMMM yyyy") | @student.Gender</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; color: #555;">INSTITUTION:</td>
+                        <td><strong>@(student.School?.Name ?? "School")</strong> (SEMIS: @(student.School?.SemisCode ?? "-"))</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; color: #555;">CLASS / GROUP:</td>
+                        <td><strong>@student.ClassLevel</strong> - @student.Group (@student.StudentType) | Medium: @student.Medium</td>
+                    </tr>
+                </table>
+
+                <!-- Photo Box -->
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+                    <div style="width: 120px; height: 140px; border: 2px solid #1e3a8a; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: #f8fafc; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                        @if (!string.IsNullOrEmpty(student.PhotoPath))
+                        {
+                            <img src="@student.PhotoPath" style="width: 100%; height: 100%; object-fit: cover;" />
+                        }
+                        else
+                        {
+                            <div style="text-align: center; color: #94a3b8; font-size: 0.8rem; font-weight: bold;">
+                                PASSPORT<br />PHOTO
+                            </div>
+                        }
+                    </div>
+                    <div style="font-size: 7.5pt; color: #666; margin-top: 4px; text-align: center;">Official Photo Stamp</div>
+                </div>
+            </div>
+
+            <!-- Registered Subjects -->
+            <div style="margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 10px;">
+                <div style="font-weight: bold; font-size: 8.5pt; color: #1e3a8a; margin-bottom: 6px;">REGISTERED EXAMINATION PAPERS:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    @foreach (var sub in subjects)
+                    {
+                        <span style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 8pt; font-weight: bold;">
+                            @sub
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- Signatures Section -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 35px; border-top: 1px solid #1e3a8a; padding-top: 10px;">
+                <div style="text-align: center; font-size: 8.5pt;">
+                    <div style="font-weight: bold; margin-bottom: 2px;">Candidate Signature</div>
+                    <div style="color: #666; font-size: 7.5pt;">(Signed in presence of Head)</div>
+                </div>
+                <div style="text-align: center; font-size: 8.5pt;">
+                    <div style="font-weight: bold; margin-bottom: 2px;">Principal / Headmaster</div>
+                    <div style="color: #666; font-size: 7.5pt;">Official School Seal</div>
+                </div>
+                <div style="text-align: center; font-size: 8.5pt;">
+                    <div style="font-weight: bold; margin-bottom: 2px; color: #1e3a8a;">Secretary / Controller</div>
+                    <div style="color: #666; font-size: 7.5pt;">BISE Hyderabad</div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Enrollment? student;
+    private List<string> subjects = new();
+    private string qrBase64 = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        student = await EnrollmentService.GetEnrollmentByIdAsync(Id);
+        if (student != null)
+        {
+            try
+            {
+                subjects = System.Text.Json.JsonSerializer.Deserialize<List<string>>(student.SubjectsJson) ?? new();
+            }
+            catch { }
+
+            var qrBytes = CertificateService.GenerateQrCodePng($"BISE-REG|NUM:{student.EnrollmentNumber}|NAME:{student.StudentName}|CNIC:{student.Cnic}|SCH:{student.School?.Name}");
+            qrBase64 = Convert.ToBase64String(qrBytes);
+        }
+    }
+
+    private async Task Print()
+    {
+        await JSRuntime.InvokeVoidAsync("biseApp.print");
+    }
+}
