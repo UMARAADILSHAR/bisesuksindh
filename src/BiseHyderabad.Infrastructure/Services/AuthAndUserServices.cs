@@ -66,6 +66,7 @@ public class AuthService : IAuthService
         }
 
         var user = await _context.Users
+            .IgnoreQueryFilters()
             .Include(u => u.School)
             .Include(u => u.District)
             .FirstOrDefaultAsync(u => u.Username.ToLower() == normalizedUsername);
@@ -337,18 +338,36 @@ public class UserService : IUserService
 public class ActivityLogService : IActivityLogService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext? _tenantContext;
 
-    public ActivityLogService(ApplicationDbContext context)
+    public ActivityLogService(ApplicationDbContext context, ITenantContext? tenantContext = null)
     {
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     public async Task LogAsync(string logName, string description, string? subjectType = null, int? subjectId = null, int? userId = null, string? username = null, object? properties = null)
     {
         try
         {
+            var tenantId = _tenantContext?.TenantId;
+            if (!tenantId.HasValue && userId.HasValue)
+            {
+                tenantId = await _context.Users
+                    .IgnoreQueryFilters()
+                    .Where(user => user.Id == userId.Value)
+                    .Select(user => (int?)user.TenantId)
+                    .SingleOrDefaultAsync();
+            }
+
+            if (!tenantId.HasValue)
+            {
+                return;
+            }
+
             var log = new ActivityLog
             {
+                TenantId = tenantId.Value,
                 LogName = logName,
                 Description = description,
                 SubjectType = subjectType,
@@ -364,6 +383,10 @@ public class ActivityLogService : IActivityLogService
         catch
         {
             // Ignore logging failures to not disrupt primary operations
+            foreach (var entry in _context.ChangeTracker.Entries<ActivityLog>().Where(entry => entry.State == EntityState.Added))
+            {
+                entry.State = EntityState.Detached;
+            }
         }
     }
 

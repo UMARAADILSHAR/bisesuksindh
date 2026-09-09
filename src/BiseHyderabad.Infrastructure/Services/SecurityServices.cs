@@ -178,18 +178,39 @@ public sealed class SecurityAuditService : ISecurityAuditService
 {
     private readonly ApplicationDbContext _context;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ITenantContext? _tenantContext;
 
-    public SecurityAuditService(ApplicationDbContext context, IHttpContextAccessor httpContextAccessor)
+    public SecurityAuditService(
+        ApplicationDbContext context,
+        IHttpContextAccessor httpContextAccessor,
+        ITenantContext? tenantContext = null)
     {
         _context = context;
         _httpContextAccessor = httpContextAccessor;
+        _tenantContext = tenantContext;
     }
 
     public async Task RecordAsync(string eventType, string action, int? userId = null, string? username = null, string? entityType = null, string? entityId = null, object? details = null)
     {
         var httpContext = _httpContextAccessor.HttpContext;
+        var tenantId = _tenantContext?.TenantId;
+        if (!tenantId.HasValue && userId.HasValue)
+        {
+            tenantId = await _context.Users
+                .IgnoreQueryFilters()
+                .Where(user => user.Id == userId.Value)
+                .Select(user => (int?)user.TenantId)
+                .SingleOrDefaultAsync();
+        }
+
+        if (!tenantId.HasValue)
+        {
+            return;
+        }
+
         _context.SecurityAuditEvents.Add(new SecurityAuditEvent
         {
+            TenantId = tenantId.Value,
             EventType = eventType,
             Action = action,
             UserId = userId,
