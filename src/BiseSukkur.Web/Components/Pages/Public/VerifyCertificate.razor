@@ -1,0 +1,141 @@
+@page "/certificate/verify"
+@page "/certificate/verify/{certNo}"
+@attribute [AllowAnonymous]
+@inject ICertificateService CertificateService
+
+<div style="max-width: 800px; margin: 2rem auto; padding: 0 1rem;">
+    <!-- Public Header -->
+    <div class="card-surface" style="text-align: center; padding: 2.5rem 1.5rem;">
+        <div style="width: 60px; height: 60px; background: #0f172a; border-radius: var(--radius-md); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1rem auto;">
+            🛡️
+        </div>
+        <h1 style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin: 0;">
+            Public Certificate & Result Verification Portal
+        </h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
+            Board of Intermediate & Secondary Education, Hyderabad (Sindh)
+        </p>
+    </div>
+
+    <!-- Verification Search Card -->
+    <div class="card-surface">
+        <div style="margin-bottom: 1.25rem;">
+            <label class="form-label" style="font-weight: 700;">Enter Certificate Number or Verification Token:</label>
+            <div style="display: flex; gap: 0.75rem;">
+                <input type="text" class="form-control" @bind="inputCode" placeholder="e.g. BISE-HYD-2026-0001 or VERIFY-HYD-2026-X9K2L" style="font-size: 1.05rem;" />
+                <button type="button" class="btn btn-primary" @onclick="VerifyCertificateNow">
+                    🔍 Verify Authenticity
+                </button>
+            </div>
+            <div style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+                Sample Certificate: <button type="button" class="chip-btn" style="display: inline;" @onclick='() => SetSample("BISE-HYD-2026-0001")'>BISE-HYD-2026-0001</button>
+            </div>
+        </div>
+
+        @if (searched && certificate == null)
+        {
+            <div class="alert-banner danger">
+                <div>
+                    <strong>❌ Unverified Record:</strong> No authentic certificate was found matching the provided reference number. Please check for typos or contact the board.
+                </div>
+            </div>
+        }
+        else if (certificate != null)
+        {
+            <div style="border: 2px solid #10b981; border-radius: var(--radius-md); padding: 1.5rem; background: #f0fdf4; margin-top: 1.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #bbf7d0; padding-bottom: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-size: 2rem;">✅</span>
+                        <div>
+                            <h3 style="font-size: 1.25rem; font-weight: 800; color: #166534; margin: 0;">
+                                OFFICIAL AUTHENTIC CERTIFICATE
+                            </h3>
+                            <div style="font-size: 0.8rem; color: #15803d;">
+                                Verified securely against the BISE Sukkur Board Master Ledger
+                            </div>
+                        </div>
+                    </div>
+                    <span class="badge badge-success" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                        VALID & ACTIVE
+                    </span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem; line-height: 1.8;">
+                    <div>
+                        <div style="color: #64748b; font-size: 0.8rem;">Candidate Name:</div>
+                        <strong style="font-size: 1.05rem; color: #0f172a;">@certificate.StudentName</strong>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.8rem;">Father's Name:</div>
+                        <strong style="color: #0f172a;">@certificate.FatherName</strong>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.8rem;">Enrollment Registration #:</div>
+                        <strong style="color: #1e40af; font-family: monospace;">@certificate.EnrollmentNumber</strong>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.8rem;">Examination Roll Number:</div>
+                        <strong style="color: #1e40af; font-family: monospace;">@certificate.RollNumber</strong>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <div style="color: #64748b; font-size: 0.8rem;">Educational Institution:</div>
+                        <strong style="color: #0f172a;">@certificate.SchoolName</strong>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.8rem;">Academic Class & Group:</div>
+                        <strong style="color: #0f172a;">@certificate.ClassLevel (@certificate.Group)</strong>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.8rem;">Marks Secured & Grade:</div>
+                        <strong style="color: #166534; font-size: 1.1rem;">
+                            @certificate.TotalMarksObtained / @certificate.TotalMaxMarks (Grade @certificate.Grade)
+                        </strong>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #bbf7d0; padding-top: 1rem; margin-top: 1rem; font-size: 0.8rem; color: #64748b;">
+                    <div>Certificate Reference: <strong>@certificate.CertificateNumber</strong></div>
+                    <div>Issued: <strong>@certificate.IssueDate.ToString("dd MMM yyyy")</strong></div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? CertNo { get; set; }
+    private string inputCode = "";
+    private Certificate? certificate;
+    private bool searched = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(CertNo))
+        {
+            inputCode = CertNo;
+            await VerifyCertificateNow();
+        }
+    }
+
+    private async Task SetSample(string sample)
+    {
+        inputCode = sample;
+        await VerifyCertificateNow();
+    }
+
+    private async Task VerifyCertificateNow()
+    {
+        searched = false;
+        certificate = null;
+
+        if (string.IsNullOrWhiteSpace(inputCode)) return;
+
+        certificate = await CertificateService.GetCertificateByNumberAsync(inputCode);
+        if (certificate == null)
+        {
+            certificate = await CertificateService.GetCertificateByTokenAsync(inputCode);
+        }
+
+        searched = true;
+    }
+}

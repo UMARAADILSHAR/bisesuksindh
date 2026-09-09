@@ -1,0 +1,90 @@
+@page "/print/student-list/{invoiceId:int}"
+@attribute [Authorize]
+@inject IChallanService ChallanService
+@inject IJSRuntime JSRuntime
+
+@if (invoice == null)
+{
+    <p style="padding: 2rem;">Loading Candidate Submission List...</p>
+}
+else
+{
+    <div class="no-print" style="padding: 1rem 2rem; background: #1e293b; color: white; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <strong style="font-size: 1.1rem;">Official Candidates Submission List</strong>
+            <span style="font-size: 0.85rem; color: #94a3b8; margin-left: 1rem;">Invoice #: @invoice.InvoiceNumber</span>
+        </div>
+        <button type="button" class="btn btn-primary" @onclick="Print">
+            🖨️ Print Candidate List
+        </button>
+    </div>
+
+    <div class="print-page" style="padding: 20px; font-family: 'Times New Roman', Times, serif;">
+        <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 15px;">
+            <h2 style="font-size: 1.3rem; font-weight: bold; margin: 0;">BOARD OF INTERMEDIATE & SECONDARY EDUCATION SUKKUR</h2>
+            <h3 style="font-size: 1rem; font-weight: bold; margin: 3px 0;">OFFICIAL CANDIDATE SUBMISSION DESPATCH LIST</h3>
+            <div style="font-size: 8.5pt;">
+                <strong>School:</strong> @(invoice.School?.Name) (SEMIS: @(invoice.School?.SemisCode)) | <strong>Invoice #:</strong> @invoice.InvoiceNumber | <strong>Type:</strong> @invoice.ClassGroupStudentType
+            </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt;">
+            <thead>
+                <tr style="background: #eee;">
+                    <th style="border: 1px solid #000; padding: 4px;">#</th>
+                    <th style="border: 1px solid #000; padding: 4px;">Candidate Name</th>
+                    <th style="border: 1px solid #000; padding: 4px;">Father's Name</th>
+                    <th style="border: 1px solid #000; padding: 4px;">CNIC / B-Form</th>
+                    <th style="border: 1px solid #000; padding: 4px;">DOB</th>
+                    <th style="border: 1px solid #000; padding: 4px;">Medium</th>
+                    <th style="border: 1px solid #000; padding: 4px;">Registration #</th>
+                    <th style="border: 1px solid #000; padding: 4px; width: 60px;">Photo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ int count = 1; }
+                @foreach (var item in invoice.Items.Where(it => it.IsIncluded).OrderBy(it => it.EnrollmentId))
+                {
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 4px; text-align: center;">@(count++)</td>
+                        <td style="border: 1px solid #000; padding: 4px; text-transform: uppercase;"><strong>@(item.Enrollment?.StudentName)</strong></td>
+                        <td style="border: 1px solid #000; padding: 4px; text-transform: uppercase;">@(item.Enrollment?.FatherName ?? "-")</td>
+                        <td style="border: 1px solid #000; padding: 4px;"><code>@(item.Enrollment?.Cnic)</code></td>
+                        <td style="border: 1px solid #000; padding: 4px;">@(item.Enrollment?.DateOfBirth.ToString("yyyy-MM-dd"))</td>
+                        <td style="border: 1px solid #000; padding: 4px;">@(item.Enrollment?.Medium)</td>
+                        <td style="border: 1px solid #000; padding: 4px;"><strong>@(item.Enrollment?.EnrollmentNumber ?? "Pending Allotment")</strong></td>
+                        <td style="border: 1px solid #000; padding: 4px; text-align: center;">
+                            <div style="width: 45px; height: 50px; border: 1px solid #999; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 6pt; color: #777;">
+                                STAMP
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 9pt;">
+            <div>Prepared By: ______________</div>
+            <div>Checked By: ______________</div>
+            <div style="text-align: center;">
+                <div style="font-weight: bold;">Principal / Headmaster Signature</div>
+                <div style="color: #666; font-size: 8pt;">Official School Stamp</div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int InvoiceId { get; set; }
+    private Invoice? invoice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        invoice = await ChallanService.GetInvoiceByIdAsync(InvoiceId);
+    }
+
+    private async Task Print()
+    {
+        await JSRuntime.InvokeVoidAsync("biseApp.print");
+    }
+}

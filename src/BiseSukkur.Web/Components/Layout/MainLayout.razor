@@ -1,0 +1,163 @@
+@inherits LayoutComponentBase
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+<MudThemeProvider Theme="_biseTheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<form id="logoutForm" method="post" action="/api/auth/logout" style="display:none">
+    <AntiforgeryToken />
+</form>
+
+<div class="app-container @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileOpen ? "sidebar-open" : "")">
+    <div class="sidebar-overlay" @onclick="CloseSidebar"></div>
+
+    <aside class="app-sidebar">
+        <NavMenu />
+    </aside>
+
+    <main class="app-main">
+        <header class="top-navbar">
+            <div style="display: flex; align-items: center;">
+                <button type="button" class="btn-hamburger" @onclick="ToggleSidebar" title="@(isSidebarCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu")">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+
+                <div class="page-title-crumb">
+                    <AuthorizeView>
+                        <Authorized>
+                            <span style="color: var(--brand-primary); font-weight: 800;">
+                                @if (context.User.IsInRole("SuperAdmin"))
+                                {
+                                    <span>SuperAdmin Console</span>
+                                }
+                                else if (context.User.IsInRole("DistrictAdmin"))
+                                {
+                                    <span>District Monitoring (@(AuthStateProvider.CurrentUserSession?.DistrictName ?? "Hyderabad"))</span>
+                                }
+                                else
+                                {
+                                    <span>@(AuthStateProvider.CurrentUserSession?.SchoolName ?? "School Portal")</span>
+                                }
+                            </span>
+                        </Authorized>
+                        <NotAuthorized>
+                            <span style="color: var(--brand-primary); font-weight: 800;">BISE Sukkur Portal</span>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+
+            <div class="top-actions">
+                <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleTheme" title="Toggle Light/Dark Theme">
+                    Theme
+                </button>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="HandleLogout">
+                            Logout
+                        </button>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="login" class="btn btn-primary btn-sm">Login</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </header>
+
+        <section class="content-wrapper">
+            <AppErrorBoundary>
+                @Body
+            </AppErrorBoundary>
+        </section>
+    </main>
+</div>
+
+@code {
+    private bool isSidebarCollapsed = false;
+    private bool isMobileOpen = false;
+
+    private async Task ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+        isMobileOpen = !isMobileOpen;
+        await JSRuntime.InvokeVoidAsync("biseApp.toggleSidebar");
+    }
+
+    private async Task CloseSidebar()
+    {
+        isMobileOpen = false;
+        await JSRuntime.InvokeVoidAsync("biseApp.closeSidebar");
+    }
+
+    private async Task ToggleTheme()
+    {
+        await JSRuntime.InvokeVoidAsync("biseApp.toggleTheme");
+    }
+
+    private async Task HandleLogout()
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, "Are you sure you want to sign out of the BISE Sukkur Portal?" },
+            { x => x.ButtonText, "Sign Out" },
+            { x => x.Color, Color.Error }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Sign Out", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await JSRuntime.InvokeVoidAsync("biseApp.submitLogout");
+        }
+    }
+
+    private readonly MudTheme _biseTheme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#0284c7",
+            Secondary = "#059669",
+            Tertiary = "#7c3aed",
+            Info = "#0891b2",
+            Success = "#059669",
+            Warning = "#d97706",
+            Error = "#dc2626",
+            Surface = "#ffffff",
+            Background = "#f1f5f9",
+            TextPrimary = "#0f172a",
+            TextSecondary = "#475569",
+            Divider = "#e2e8f0",
+            TableLines = "#e2e8f0",
+            TableStriped = "#f8fafc",
+            TableHover = "#f1f5f9",
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#38bdf8",
+            Secondary = "#34d399",
+            Tertiary = "#a78bfa",
+            Info = "#22d3ee",
+            Success = "#34d399",
+            Warning = "#fbbf24",
+            Error = "#f87171",
+            Surface = "#1e293b",
+            Background = "#0f172a",
+            TextPrimary = "#f1f5f9",
+            TextSecondary = "#94a3b8",
+            TableLines = "#334155",
+            TableStriped = "#1e293b",
+            TableHover = "#334155",
+            Divider = "#334155",
+        }
+    };
+}

@@ -13,3 +13,5 @@ obj/
 appsettings.Development.json
 TestResults/
 *.log
+publish/
+*.zip

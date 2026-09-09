@@ -1,0 +1,126 @@
+@page "/print/challan/{id:int}"
+@attribute [Authorize]
+@inject IChallanService ChallanService
+@inject ICertificateService CertificateService
+@inject IJSRuntime JSRuntime
+
+@if (invoice == null)
+{
+    <p style="padding: 2rem;">Loading Official Bank Challan Voucher...</p>
+}
+else
+{
+    <div class="no-print" style="padding: 1rem 2rem; background: #1e293b; color: white; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <strong style="font-size: 1.1rem;">Official Bank Challan #@invoice.InvoiceNumber</strong>
+            <span style="font-size: 0.85rem; color: #94a3b8; margin-left: 1rem;">4-Part Bank Voucher (Landscape A4)</span>
+        </div>
+        <button type="button" class="btn btn-primary" @onclick="Print">
+            🖨️ Print Bank Challan Voucher
+        </button>
+    </div>
+
+    <div class="print-page" style="background: white; padding: 10px; font-family: 'Times New Roman', Times, serif;">
+        <div class="bank-challan-container">
+            @for (int part = 1; part <= 4; part++)
+            {
+                var copyName = part switch
+                {
+                    1 => "1. BANK COPY",
+                    2 => "2. BOARD COPY",
+                    3 => "3. SCHOOL COPY",
+                    _ => "4. CANDIDATE COPY"
+                };
+
+                <div class="challan-slip">
+                    <div>
+                        <div class="challan-header">
+                            <h3>BOARD OF INTERMEDIATE & SECONDARY EDUCATION SUKKUR</h3>
+                            <div style="font-size: 8pt; font-weight: bold; margin-top: 2px;">HABIB BANK LIMITED / NBP (ANY BRANCH)</div>
+                            <div style="font-size: 7.5pt; color: #333;">A/C #: 0042-79012345-03 (BISE SUKKUR COLLECTION)</div>
+                            <div style="font-size: 8.5pt; font-weight: bold; background: #eee; padding: 2px; margin-top: 4px; border: 1px solid #999;">
+                                @copyName
+                            </div>
+                        </div>
+
+                        <div style="font-size: 7.5pt; margin-bottom: 6px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span><strong>Challan #:</strong> @invoice.InvoiceNumber</span>
+                                <span><strong>Date:</strong> @invoice.GeneratedAt.ToString("yyyy-MM-dd")</span>
+                            </div>
+                            <div><strong>School:</strong> @(invoice.School?.Name ?? "School")</div>
+                            <div><strong>SEMIS:</strong> @(invoice.School?.SemisCode ?? "-") | <strong>District:</strong> @(invoice.School?.District?.Name ?? "Sukkur")</div>
+                            <div><strong>Class/Group:</strong> @invoice.ClassGroupStudentType</div>
+                        </div>
+
+                        <table class="challan-table">
+                            <thead>
+                                <tr>
+                                    <th>Particulars</th>
+                                    <th style="text-align: right;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div>@invoice.InvoiceType.ToUpper() FEE</div>
+                                        <div style="font-size: 7pt; color: #555;">(@invoice.StudentCount Candidates)</div>
+                                    </td>
+                                    <td style="text-align: right; font-weight: bold;">
+                                        Rs. @invoice.Amount.ToString("N0")
+                                    </td>
+                                </tr>
+                                <tr style="background: #f9f9f9; font-weight: bold;">
+                                    <td>TOTAL PAYABLE</td>
+                                    <td style="text-align: right; font-size: 8.5pt;">
+                                        Rs. @invoice.Amount.ToString("N0")
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="font-size: 7pt; margin-top: 4px; line-height: 1.2;">
+                            <div><strong>Phase:</strong> @invoice.Phase.ToUpper()</div>
+                            <div><strong>Due Date:</strong> @(invoice.GeneratedAt.AddDays(15).ToString("yyyy-MM-dd"))</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        @if (!string.IsNullOrEmpty(qrBase64))
+                        {
+                            <div style="text-align: center; margin: 4px 0;">
+                                <img src="data:image/png;base64,@qrBase64" style="width: 55px; height: 55px;" />
+                            </div>
+                        }
+
+                        <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 7pt; border-top: 1px dashed #666; padding-top: 4px;">
+                            <span>Depositor's Sign</span>
+                            <span>Cashier / Officer</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Invoice? invoice;
+    private string qrBase64 = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        invoice = await ChallanService.GetInvoiceByIdAsync(Id);
+        if (invoice != null)
+        {
+            var qrBytes = CertificateService.GenerateQrCodePng($"BISE-HYD|INV:{invoice.InvoiceNumber}|AMT:{invoice.Amount}|COUNT:{invoice.StudentCount}");
+            qrBase64 = Convert.ToBase64String(qrBytes);
+        }
+    }
+
+    private async Task Print()
+    {
+        await JSRuntime.InvokeVoidAsync("biseApp.print");
+    }
+}

@@ -1,0 +1,151 @@
+@page "/login"
+@layout LoginLayout
+@inject NavigationManager Navigation
+
+<div class="auth-card" style="max-width: 440px; width: 100%; margin: auto; padding: 2rem; background: var(--surface, #ffffff); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
+    <div class="auth-header" style="text-align: center; margin-bottom: 1.5rem;">
+        <img src="images/bise-logo.png" alt="BISE Sukkur Logo" class="auth-logo-img" 
+             style="width: 80px; height: 80px; object-fit: contain; border-radius: 50%; margin: 0 auto 12px auto; display: block; background: #ffffff; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); border: 2px solid #e2e8f0;" />
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0 0 4px 0;">BISE Sukkur</h2>
+        <p style="font-size: 0.8125rem; color: #64748b; margin: 0;">Board Examination & Registration System (Sindh)</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <div class="alert-banner danger" style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 0.8125rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>⚠️</span>
+            <span>@Error</span>
+        </div>
+    }
+
+    <!-- Standard HTTP Form POST to /api/auth/login for persistent HTTP Cookie authentication -->
+    <form method="post" action="/api/auth/login" id="loginForm">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+
+        <div class="form-group" style="margin-bottom: 1.15rem;">
+            <label class="form-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">
+                Login ID / Username
+            </label>
+            <input type="text" id="usernameInput" name="username" class="form-control" 
+                   style="width: 100%; padding: 0.75rem 0.875rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.9375rem; color: #0f172a;" 
+                   value="@usernameValue"
+                   @oninput="@((e) => usernameValue = e.Value?.ToString() ?? "")"
+                   placeholder="e.g. superadmin or schooladmin" required autocomplete="username" />
+        </div>
+
+        @if (MfaRequired)
+        {
+            <div class="form-group" style="margin-bottom: 1.15rem;">
+                <label class="form-label">Authenticator Code</label>
+                <input type="text" name="mfaCode" class="form-control" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required />
+            </div>
+        }
+
+        <div class="form-group" style="margin-bottom: 1.15rem;">
+            <label class="form-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">
+                Password
+            </label>
+            <div style="position: relative; display: flex; align-items: center;">
+                <input type="@(showPassword ? "text" : "password")" 
+                       id="passwordInput"
+                       name="password"
+                       class="form-control" 
+                       style="width: 100%; padding: 0.75rem 2.75rem 0.75rem 0.875rem; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.9375rem; color: #0f172a;" 
+                       value="@passwordValue"
+                       @oninput="@((e) => passwordValue = e.Value?.ToString() ?? "")"
+                       placeholder="Enter your password" required autocomplete="current-password" />
+                
+                <!-- Eye View Password Toggle Button -->
+                <button type="button" 
+                        @onclick="TogglePasswordVisibility" 
+                        title="@(showPassword ? "Hide password" : "Show password")"
+                        aria-label="@(showPassword ? "Hide password" : "Show password")"
+                        style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: transparent; border: none; padding: 0.35rem 0.5rem; cursor: pointer; color: #64748b; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                    @if (showPassword)
+                    {
+                        <!-- Eye Slash (Hide) SVG -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+                            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+                            <line x1="2" y1="2" x2="22" y2="22"></line>
+                        </svg>
+                    }
+                    else
+                    {
+                        <!-- Eye (Show) SVG -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; margin-top: 0.5rem; font-weight: 700; letter-spacing: 0.03em; border-radius: 8px; background: #0284c7; color: white; border: none; cursor: pointer;">
+            Sign In to Portal
+        </button>
+    </form>
+
+    <!-- Quick Fill Demo Accounts (Development / Demo Mode) -->
+    <div style="margin-top: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.6rem; letter-spacing: 0.04em;">
+            ⚡ Quick-Fill Demo Credentials (Password: <span style="font-family: monospace; color: #0284c7; font-weight: 700;">Admin@12345</span>)
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+            <button type="button" class="btn btn-sm" @onclick='() => QuickFill("superadmin", "Admin@12345")' 
+                    style="font-size: 0.75rem; padding: 0.35rem 0.65rem; background: #0f172a; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                👑 Super Admin
+            </button>
+            <button type="button" class="btn btn-sm" @onclick='() => QuickFill("schooladmin", "Admin@12345")' 
+                    style="font-size: 0.75rem; padding: 0.35rem 0.65rem; background: #047857; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                🏫 School Admin
+            </button>
+            <button type="button" class="btn btn-sm" @onclick='() => QuickFill("districtadmin", "Admin@12345")' 
+                    style="font-size: 0.75rem; padding: 0.35rem 0.65rem; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                🏢 District Admin
+            </button>
+            <button type="button" class="btn btn-sm" @onclick='() => QuickFill("kh1-001", "Admin@12345")' 
+                    style="font-size: 0.75rem; padding: 0.35rem 0.65rem; background: #6b21a8; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                🏛️ Govt High School
+            </button>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle, #e2e8f0);">
+        <a href="certificate/verify" style="color: #0284c7; font-size: 0.825rem; font-weight: 600; text-decoration: none;">
+            Public Candidate Certificate Verification Portal →
+        </a>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "mfa")]
+    public string? Mfa { get; set; }
+
+    private bool MfaRequired => Mfa == "1";
+
+    private string usernameValue = "";
+    private string passwordValue = "";
+    private bool showPassword = false;
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+
+    private void QuickFill(string username, string password)
+    {
+        usernameValue = username;
+        passwordValue = password;
+        Error = null;
+    }
+}
