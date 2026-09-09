@@ -39,6 +39,8 @@ EXPOSE 8080
 
 COPY --from=build /app/publish .
 
+RUN chown -R 1654:1654 /app
+
 # ECS-native container health check (liveness probe)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
@@ -46,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Run with non-root security container profile (dotnet default UID)
 USER 1654
 
-ENTRYPOINT ["dotnet", "BiseHyderabad.Web.dll"]
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://0.0.0.0:${PORT:-8080} dotnet BiseHyderabad.Web.dll"]
