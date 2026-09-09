@@ -25,21 +25,16 @@ jobs:
     - name: Run Test Suite
       run: dotnet test BiseSukkur.slnx --configuration Release --no-restore --verbosity normal
 
-    - name: Publish Web Application (Release)
-      run: |
-        dotnet publish src/BiseSukkur.Web/BiseSukkur.Web.csproj -c Release -o ./publish --no-self-contained
-        if (-not (Test-Path ./publish/logs)) { New-Item -ItemType Directory -Path ./publish/logs -Force }
-
-    - name: Deploy via FTPS to SmarterASP.NET
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      if: env.HAS_SECRETS == 'true'
+    - name: Deploy to SmarterASP.NET via Web Deploy
+      if: env.HAS_DEPLOY_SECRET == 'true'
       env:
-        HAS_SECRETS: ${{ secrets.SMARTERASP_FTP_SERVER != '' && secrets.SMARTERASP_FTP_USERNAME != '' }}
-      with:
-        server: ${{ secrets.SMARTERASP_FTP_SERVER }}
-        username: ${{ secrets.SMARTERASP_FTP_USERNAME }}
-        password: ${{ secrets.SMARTERASP_FTP_PASSWORD }}
-        server-dir: ${{ secrets.SMARTERASP_FTP_PATH || '/' }}
-        local-dir: ./publish/
-        protocol: ftps
-        security: loose
+        HAS_DEPLOY_SECRET: ${{ secrets.SMARTERASP_PASSWORD != '' }}
+      run: |
+        dotnet publish src/BiseSukkur.Web/BiseSukkur.Web.csproj -c Release /p:PublishProfile="indussoftwaretec-001-site1 - Web Deploy" /p:Password="${{ secrets.SMARTERASP_PASSWORD }}" /p:AllowUntrustedCertificate=True
+
+    - name: Fallback Deploy via FTP
+      if: env.HAS_FTP_SECRET == 'true' && env.HAS_DEPLOY_SECRET != 'true'
+      env:
+        HAS_FTP_SECRET: ${{ secrets.SMARTERASP_FTP_PASSWORD != '' }}
+      run: |
+        dotnet publish src/BiseSukkur.Web/BiseSukkur.Web.csproj -c Release /p:PublishProfile="indussoftwaretec-001-site1 - FTP" /p:Password="${{ secrets.SMARTERASP_FTP_PASSWORD }}"
