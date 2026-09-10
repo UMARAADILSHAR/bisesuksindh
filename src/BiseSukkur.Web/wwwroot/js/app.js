@@ -44,6 +44,19 @@ window.biseApp = {
     submitLogout: function () {
         const form = document.getElementById('logoutForm');
         if (form) form.submit();
+    },
+    setInputValue: function (id, value) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = value ?? '';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    },
+    togglePasswordType: function (id) {
+        const el = document.getElementById(id);
+        if (!el) return 'password';
+        el.type = el.type === 'password' ? 'text' : 'password';
+        return el.type;
     }
 };
 

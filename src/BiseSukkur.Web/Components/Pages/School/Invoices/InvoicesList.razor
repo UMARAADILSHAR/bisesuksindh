@@ -27,36 +27,39 @@
 }
 else
 {
-    <!-- KPI Cards -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem;" class="mb-4 kpi-grid-container">
-        <KpiCard Title="Total Invoices"
-                 Value="@(metrics?.TotalInvoices.ToString() ?? "0")"
-                 Subtitle="@($"Value: Rs. {(metrics?.TotalAmount ?? 0):N0}")"
-                 BadgeText="TOTAL"
-                 Variant="blue"
-                 IsLoading="@isLoadingStats" />
+    <!-- Compact Single-Line KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Total Invoices</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.TotalInvoices ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
 
-        <KpiCard Title="Enrollment Challans"
-                 Value="@(metrics?.EnrollmentCount.ToString() ?? "0")"
-                 Subtitle="@($"Rs. {(metrics?.EnrollmentAmount ?? 0):N0}")"
-                 BadgeText="ENROLLMENT"
-                 Variant="emerald"
-                 IsLoading="@isLoadingStats" />
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Enrollment Challans</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.EnrollmentCount ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.School" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
 
-        <KpiCard Title="Exam Challans"
-                 Value="@(metrics?.ExamCount.ToString() ?? "0")"
-                 Subtitle="@($"Rs. {(metrics?.ExamAmount ?? 0):N0}")"
-                 BadgeText="EXAM"
-                 Variant="purple"
-                 IsLoading="@isLoadingStats" />
+        <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 8px; padding: 12px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Exam Challans</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.ExamCount ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
 
-        <KpiCard Title="Verified Collections"
-                 Value="@($"Rs. {(metrics?.VerifiedAmount ?? 0):N0}")"
-                 Subtitle="@($"Pending: Rs. {(metrics?.PendingAmount ?? 0):N0}")"
-                 BadgeText="PAID"
-                 Variant="amber"
-                 IsMono="true"
-                 IsLoading="@isLoadingStats" />
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Verified Collections</div>
+                <div style="font-size: 20px; font-weight: 700; line-height: 1; margin-top: 4px; font-family: monospace;">Rs. @((metrics?.VerifiedAmount ?? 0).ToString("N0"))</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
     </div>
 
     <!-- Filters -->

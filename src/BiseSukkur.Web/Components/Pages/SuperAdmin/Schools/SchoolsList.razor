@@ -19,7 +19,7 @@
 <div class="card-surface" style="padding: 1rem 1.25rem;">
     <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
         <div style="flex: 1; min-width: 250px;">
-            <input type="text" class="form-control" placeholder="Search by name, SEMIS code, or school code..." @bind="searchTerm" @bind:event="oninput" @bind:after="FilterSchools" />
+            <input type="text" class="form-control" placeholder="Search by name, SEMIS code, or school code..." @bind="searchTerm" @bind:after="FilterSchools" />
         </div>
         <div style="width: 200px;">
             <select class="form-select" @bind="selectedDistrictId" @bind:after="FilterSchools">

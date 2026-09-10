@@ -13,652 +13,660 @@
 @implements IDisposable
 
 <style>
-    /* ── Document Page Container (Modern Executive Blazor UX) ── */
-    .enroll-page-bg {
-        background: #f8fafc;
+    .enrollment-container {
+        max-width: 1100px; /* Wider than A4 for better spacing */
+        margin: 0 auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #f0f9f4 0%, #e8f5e9 100%);
         min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        padding: 24px 16px 48px 16px;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
-    .enroll-document {
-        width: 100%;
-        max-width: 960px;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-        padding: 28px 32px;
-        box-sizing: border-box;
-    }
-
-    /* ── Document Header ── */
-    .doc-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-bottom: 16px;
-        margin-bottom: 24px;
-        border-bottom: 2px solid #0f172a;
-    }
-    .doc-header-left h2 {
-        font-size: 1.35rem;
-        font-weight: 800;
-        color: #0f172a;
-        margin: 0;
-        letter-spacing: -0.01em;
-        text-transform: uppercase;
-    }
-    .doc-header-left p {
-        font-size: 0.8125rem;
-        color: #64748b;
-        margin: 4px 0 0 0;
-        font-weight: 500;
-    }
-
-    /* ── Modern Card Section ── */
-    .doc-section {
-        border: 1px solid #e2e8f0;
+    .enrollment-form-page {
+        background: white;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         border-radius: 8px;
-        margin-bottom: 22px;
-        background: #ffffff;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        padding: 32px;
+        margin-bottom: 20px;
     }
-    .doc-section-header {
-        background: #f8fafc;
-        padding: 10px 16px;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 0.8125rem;
+
+    .form-header {
+        text-align: center;
+        border-bottom: 3px solid #4caf50;
+        padding-bottom: 12px;
+        margin-bottom: 24px;
+    }
+
+    .form-header h1 {
+        font-size: 22px;
         font-weight: 700;
-        color: #0f172a;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .doc-section-body {
-        padding: 20px 20px 8px 20px;
+        color: #2e7d32;
+        margin: 0 0 4px 0;
     }
 
-    /* ── Modern Floating Outline Field System ── */
-    .float-group {
-        position: relative;
-        margin-bottom: 18px;
+    .form-header p {
+        font-size: 13px;
+        color: #666;
+        margin: 0;
     }
 
-    .float-input, .float-select {
-        width: 100%;
-        height: 44px;
-        padding: 12px 14px;
-        font-size: 0.875rem;
-        font-family: inherit;
-        color: #0f172a;
-        background: #ffffff;
-        border: 1.5px solid #cbd5e1;
+    .section-title {
+        background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+        color: white;
+        padding: 8px 14px;
         border-radius: 6px;
-        outline: none;
-        box-sizing: border-box;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .float-input.caps-field {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 20px 0 14px 0;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
-    .float-select {
-        appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23475569'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 10px center;
-        background-size: 18px;
-        padding-right: 32px;
+    .compact-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
     }
 
-    .float-input:focus, .float-select:focus {
-        border-color: #1e3a8a;
-        box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.12);
+    .compact-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
     }
 
-    .float-input[readonly], .float-select:disabled {
-        background: #f8fafc;
-        color: #64748b;
-        border-color: #e2e8f0;
-        cursor: default;
+    .compact-field {
+        margin: 0 !important;
     }
 
-    .float-label {
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: #ffffff;
-        padding: 0 6px;
-        font-size: 0.8125rem;
+    .compact-field .mud-input-control {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .compact-field .mud-input-label {
+        font-size: 13px;
         font-weight: 500;
-        color: #64748b;
-        pointer-events: none;
-        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-        border-radius: 2px;
     }
 
-    .float-label.required::after {
-        content: " *";
-        color: #dc2626;
+    .compact-field input,
+    .compact-field .mud-input-slot {
+        font-size: 14px;
+        padding: 10px 14px !important;
     }
 
-    /* Floating State: when focused, has value, or date/readonly */
-    .float-input:focus ~ .float-label,
-    .float-input:not(:placeholder-shown) ~ .float-label,
-    .float-select:focus ~ .float-label,
-    .float-group.floating .float-label {
-        top: 0;
-        font-size: 0.6875rem;
-        font-weight: 700;
-        color: #1e3a8a;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+    .compact-field .mud-select {
+        font-size: 14px;
     }
 
-    /* ── Grids ── */
-    .f-grid { display: grid; gap: 0 16px; }
-    .f-cols-4 { grid-template-columns: repeat(4, 1fr); }
-    .f-cols-3 { grid-template-columns: repeat(3, 1fr); }
-    .f-cols-2 { grid-template-columns: repeat(2, 1fr); }
-    .f-cols-1 { grid-template-columns: 1fr; }
-    @@media (max-width: 768px) {
-        .f-cols-4, .f-cols-3 { grid-template-columns: repeat(2, 1fr); }
-    }
-    @@media (max-width: 520px) {
-        .f-cols-4, .f-cols-3, .f-cols-2 { grid-template-columns: 1fr; }
-    }
-
-    /* ── Medium Segmented Toggle ── */
-    .medium-toggle-box {
-        position: relative;
-        margin-bottom: 18px;
-    }
-    .medium-toggle-label {
-        position: absolute;
-        left: 12px;
-        top: 0;
-        transform: translateY(-50%);
-        background: #ffffff;
-        padding: 0 6px;
-        font-size: 0.6875rem;
-        font-weight: 700;
-        color: #1e3a8a;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        z-index: 5;
-        line-height: 1;
-        border-radius: 2px;
-    }
-    .medium-toggle-group {
+    .medium-button-group {
         display: flex;
-        border: 1.5px solid #cbd5e1;
-        border-radius: 6px;
-        overflow: hidden;
-        height: 44px;
-        box-sizing: border-box;
-        background: #ffffff;
-        position: relative;
+        gap: 10px;
+        margin-top: 6px;
     }
+
     .medium-btn {
         flex: 1;
-        border: none;
-        border-right: 1px solid #cbd5e1;
-        background: #ffffff;
-        font-size: 0.8125rem;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 14px;
         font-weight: 600;
-        color: #475569;
-        cursor: pointer;
-        font-family: inherit;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 8px;
-        transition: background 0.12s, color 0.12s;
-    }
-    .medium-btn:last-child { border-right: none; }
-    .medium-btn:hover { background: #f1f5f9; color: #0f172a; }
-    .medium-btn.active {
-        background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
-        color: #ffffff;
-        font-weight: 700;
-    }
-
-    /* ── Bio Data Layout (Fields + Photo) ── */
-    .bio-grid-wrap {
-        display: grid;
-        grid-template-columns: 1fr 140px;
-        gap: 20px;
-        align-items: start;
-    }
-    @@media (max-width: 700px) {
-        .bio-grid-wrap { grid-template-columns: 1fr; }
-    }
-
-    .photo-box-wrap {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 2px;
-    }
-    .photo-card {
-        width: 135px;
-        height: 165px;
-        border: 2px dashed #94a3b8;
-        border-radius: 6px;
-        background: #f8fafc;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        overflow: hidden;
-        transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .photo-card:hover {
-        border-color: #1e3a8a;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.08);
-    }
-    .photo-placeholder {
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: #64748b;
         text-align: center;
-        line-height: 1.3;
     }
 
-    /* ── Alerts ── */
-    .d-alert-error {
-        padding: 10px 14px;
-        border-radius: 6px;
-        background: #fef2f2;
-        color: #991b1b;
-        border-left: 4px solid #dc2626;
-        font-size: 0.8125rem;
-        margin-bottom: 16px;
-    }
-    .d-alert-success {
-        padding: 10px 14px;
-        border-radius: 6px;
-        background: #ecfdf5;
-        color: #065f46;
-        border-left: 4px solid #047857;
-        font-size: 0.8125rem;
-        margin-bottom: 16px;
+    .medium-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
-    /* ── Centered Submit Action Bar ── */
-    .d-action-bar {
+    .medium-btn.active {
+        background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+        color: white;
+        border-color: #4caf50;
+        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    }
+
+    .photo-upload-compact {
+        width: 140px;
+        height: 170px;
+        border: 2px dashed #4caf50;
+        border-radius: 8px;
         display: flex;
-        justify-content: center;
-        padding-top: 16px;
-    }
-    .btn-submit-enroll {
-        display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0 42px;
-        height: 44px;
-        font-size: 0.925rem;
-        font-weight: 700;
-        border-radius: 6px;
-        border: 1px solid #047857;
-        background: #047857;
-        color: #ffffff;
         cursor: pointer;
-        font-family: inherit;
-        letter-spacing: 0.02em;
-        box-shadow: 0 2px 4px rgba(4, 120, 87, 0.2);
-        transition: all 0.15s ease;
+        background: #f9fdf9;
+        transition: all 0.3s ease;
     }
-    .btn-submit-enroll:hover:not(:disabled) {
-        background: #065f46;
-        border-color: #065f46;
-        box-shadow: 0 4px 8px rgba(4, 120, 87, 0.3);
+
+    .photo-upload-compact:hover {
+        border-color: #2e7d32;
+        background: #f1f8f1;
     }
-    .btn-submit-enroll:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+
+    .photo-upload-compact img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+
+    .preview-modal {
+        max-width: 900px;
+    }
+
+    .preview-section {
+        margin-bottom: 20px;
+    }
+
+    .preview-section-title {
+        background: #f5f5f5;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        color: #333;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .preview-item {
+        padding: 10px 12px;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+
+    .preview-label {
+        font-weight: 600;
+        color: #555;
+        margin-right: 6px;
+    }
+
+    .preview-value {
+        color: #333;
+    }
+
+    .submit-section {
+        text-align: center;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 2px dashed #e0e0e0;
+    }
+
+    .submit-btn {
+        background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%) !important;
+        padding: 12px 40px !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        border-radius: 25px !important;
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3) !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4) !important;
+    }
+
+    .date-smart-input input {
+        font-family: monospace;
+    }
+
+    .fetch-record-panel {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border: 2px solid #2196f3;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 10px 0;
+    }
+
+    .alert-compact {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        margin: 10px 0;
+    }
+
+    @@media (max-width: 768px) {
+        .enrollment-container {
+            max-width: 100%;
+            padding: 10px;
+        }
+        
+        .enrollment-form-page {
+            padding: 16px;
+        }
+
+        .compact-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 
-<div class="enroll-page-bg">
-    <div class="enroll-document" @oninput="MarkDirty">
-
-        <!-- Document Header -->
-        <div class="doc-header">
-            <div class="doc-header-left">
-                <h2>@(Id == null ? "STUDENT ENROLLMENT FORM" : "EDIT STUDENT ENROLLMENT")</h2>
-                <p>Board of Intermediate & Secondary Education Hyderabad &nbsp;|&nbsp; Session @(activeYearName)</p>
-            </div>
-            <button type="button" class="btn btn-secondary btn-sm" @onclick='() => Navigation.NavigateTo("school/enrollments")'>
-                ← Back to List
-            </button>
+<div class="enrollment-container">
+    <div class="enrollment-form-page">
+        <div class="form-header">
+            <h1>@(Id == null ? "Student Enrollment Form" : "Edit Student Enrollment")</h1>
+            <p>Board of Intermediate & Secondary Education · Session @activeYearName</p>
         </div>
 
         <WindowStatusAlert Window="@enrollmentWindow" WindowLabel="Enrollment" />
 
-        <!-- Success or Error Alert -->
         @if (!string.IsNullOrEmpty(successMessage))
         {
-            <div class="d-alert-success" role="alert">
-                <span>@successMessage</span>
-            </div>
+            <MudAlert Severity="Severity.Success" Dense="true" Class="alert-compact" ShowCloseIcon="true" CloseIconClicked="() => successMessage = null">
+                @successMessage
+            </MudAlert>
         }
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div class="d-alert-error" role="alert">
-                <span>⚠️ @errorMessage</span>
+            <MudAlert Severity="Severity.Error" Dense="true" Class="alert-compact" ShowCloseIcon="true" CloseIconClicked="() => errorMessage = null">
+                @errorMessage
+            </MudAlert>
+        }
+
+        <div class="section-title">📚 1. Academic Information</div>
+        
+        <div class="compact-grid-3">
+            <MudTextField T="string" Value="@activeYearName" Label="Academic Session" Variant="Variant.Outlined"
+                          Class="compact-field" ReadOnly="true" />
+            
+            <MudSelect T="string" @bind-Value="student.ClassLevel" @bind-Value:after="OnClassLevelChanged"
+                       Label="Class Level" Variant="Variant.Outlined" Class="compact-field" Required="true">
+                <MudSelectItem T="string" Value="@("SSC-I 1ST ANNUAL")">SSC-I 1ST ANNUAL</MudSelectItem>
+                <MudSelectItem T="string" Value="@("SSC-II 2ND ANNUAL")">SSC-II 2ND ANNUAL</MudSelectItem>
+                <MudSelectItem T="string" Value="@("HSC-I 1ST ANNUAL")">HSC-I 1ST ANNUAL</MudSelectItem>
+                <MudSelectItem T="string" Value="@("HSC-II 2ND ANNUAL")">HSC-II 2ND ANNUAL</MudSelectItem>
+            </MudSelect>
+            
+            <MudSelect T="string" @bind-Value="student.Group" @bind-Value:after="OnGroupChanged"
+                       Label="Study Group" Variant="Variant.Outlined" Class="compact-field" Required="true">
+                @foreach (var g in GetGroupsForClass(student.ClassLevel))
+                {
+                    <MudSelectItem T="string" Value="@g">@g</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        <div class="compact-grid-3">
+            @if (IsStudentTypeLocked(student.ClassLevel, student.Group))
+            {
+                <MudTextField T="string" Value="@("FRESH")" Label="Category" Variant="Variant.Outlined"
+                              Class="compact-field" ReadOnly="true" HelperText="Auto-set for group" />
+            }
+            else
+            {
+                <MudSelect T="string" @bind-Value="student.StudentType" @bind-Value:after="MarkDirty"
+                           Label="Category" Variant="Variant.Outlined" Class="compact-field" Required="true">
+                    <MudSelectItem T="string" Value="@("FRESH")">FRESH</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("REPEATER")">REPEATER</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("REAPPEAR")">REAPPEAR</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("PRIVATE")">PRIVATE</MudSelectItem>
+                </MudSelect>
+            }
+
+            <MudTextField T="string" @bind-Value="student.GrNumber" @bind-Value:after="MarkDirty"
+                          Label="G.R / Admission No" Variant="Variant.Outlined" Class="compact-field" Required="true" />
+            
+            <MudTextField T="string" Value="@FormatDateDisplay(student.AdmissionDate)" 
+                          ValueChanged="@((string v) => OnSmartDateChanged(v, d => student.AdmissionDate = d))"
+                          Label="Admission Date" Variant="Variant.Outlined" Class="compact-field date-smart-input"
+                          Placeholder="01-Jan-2010" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.CalendarToday" OnAdornmentClick="@(() => ShowDatePicker("admission"))" />
+        </div>
+
+        @if (IsHscLevel(student.ClassLevel))
+        {
+            <div class="fetch-record-panel">
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; align-items: end;">
+                    <MudTextField T="string" @bind-Value="prevSeatNo" @bind-Value:after="MarkDirty"
+                                  Label="Previous SSC-II Roll #" Variant="Variant.Outlined"
+                                  Class="compact-field" MaxLength="10" />
+                    <MudSelect T="string" @bind-Value="prevPassingYear" Label="Year"
+                               Variant="Variant.Outlined" Class="compact-field">
+                        <MudSelectItem T="string" Value="@("2025")">2025</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("2024")">2024</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("2023")">2023</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("2022")">2022</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Medium"
+                               StartIcon="@Icons.Material.Filled.Search" OnClick="FetchPreviousSscRecord">
+                        Fetch Record
+                    </MudButton>
+                </div>
             </div>
         }
 
-        <!-- ══════════ 1. ACADEMIC INFORMATION ══════════ -->
-        <div class="doc-section">
-            <div class="doc-section-header">
-                <span>1. Academic Information</span>
-                <span style="font-size: 0.72rem; color: #64748b; font-weight: normal;">Board Class & Group Allocation</span>
+        <div class="compact-grid-3">
+            <MudTextField T="string" @bind-Value="student.BoardRegNo" @bind-Value:after="MarkDirty"
+                          Label="Enrollment / Reg No" Variant="Variant.Outlined" Class="compact-field" />
+            
+            <MudTextField T="string" @bind-Value="student.EligibilityNo" @bind-Value:after="MarkDirty"
+                          Label="Eligibility No" Variant="Variant.Outlined" Class="compact-field"
+                          Style="text-transform: uppercase;" />
+            
+            <MudSelect T="string" @bind-Value="selectedPreviousBoard" @bind-Value:after="OnPreviousBoardChanged"
+                       Label="Previous Board" Variant="Variant.Outlined" Class="compact-field">
+                <MudSelectItem T="string" Value="@("BISE Sukkur")">BISE Sukkur</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Other")">Other Board</MudSelectItem>
+            </MudSelect>
+        </div>
+
+        <div class="compact-grid-3">
+            @if (selectedPreviousBoard == "Other")
+            {
+                <MudTextField T="string" @bind-Value="student.PreviousBoard" @bind-Value:after="MarkDirty"
+                              Label="Other Board Name" Variant="Variant.Outlined" Class="compact-field"
+                              Style="text-transform: uppercase;" />
+            }
+            else
+            {
+                <MudTextField T="string" Value="@("BISE Sukkur")" Label="Board Name" Variant="Variant.Outlined"
+                              Class="compact-field" ReadOnly="true" />
+            }
+            
+            <MudTextField T="string" Value="@FormatDateDisplay(student.BoardPassingDate)"
+                          ValueChanged="@((string v) => OnSmartDateChanged(v, d => student.BoardPassingDate = d))"
+                          Label="Board Passing Date" Variant="Variant.Outlined" Class="compact-field date-smart-input"
+                          Placeholder="01-Jan-2010" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.CalendarToday" OnAdornmentClick="@(() => ShowDatePicker("boardPassing"))" />
+        </div>
+
+        <div class="section-title">👤 2. Candidate Bio Data</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 150px; gap: 20px;">
+            <div>
+                <div class="compact-grid-2">
+                    <MudTextField T="string" @bind-Value="student.StudentName" @bind-Value:after="MarkDirty"
+                                  Label="Candidate Full Name" Variant="Variant.Outlined" Class="compact-field"
+                                  Required="true" Style="text-transform: uppercase;" />
+                    
+                    <MudTextField T="string" @bind-Value="student.Cnic" @bind-Value:after="OnCnicChanged"
+                                  Label="CNIC / B-Form" Variant="Variant.Outlined" Class="compact-field"
+                                  Required="true" MaxLength="15" HelperText="41303-1234567-1" />
+                </div>
+
+                <div class="compact-grid-2">
+                    <MudTextField T="string" @bind-Value="student.FatherName" @bind-Value:after="MarkDirty"
+                                  Label="Father's Full Name" Variant="Variant.Outlined" Class="compact-field"
+                                  Required="true" Style="text-transform: uppercase;" />
+                    
+                    <MudTextField T="string" @bind-Value="student.FatherCnic" @bind-Value:after="OnFatherCnicChanged"
+                                  Label="Father's CNIC" Variant="Variant.Outlined" Class="compact-field"
+                                  MaxLength="15" HelperText="41303-1234567-1" />
+                </div>
+
+                <div class="compact-grid-2">
+                    <MudTextField T="string" @bind-Value="student.Surname" @bind-Value:after="MarkDirty"
+                                  Label="Surname / Caste" Variant="Variant.Outlined" Class="compact-field"
+                                  Required="true" Style="text-transform: uppercase;" />
+                    
+                    <MudSelect T="string" @bind-Value="student.Gender" @bind-Value:after="MarkDirty"
+                               Label="Gender" Variant="Variant.Outlined" Class="compact-field" Required="true">
+                        <MudSelectItem T="string" Value="@("Male")">Male</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Female")">Female</MudSelectItem>
+                    </MudSelect>
+                </div>
+
+                <div class="compact-grid-2">
+                    <MudSelect T="string" @bind-Value="student.Religion" @bind-Value:after="MarkDirty"
+                               Label="Religion" Variant="Variant.Outlined" Class="compact-field" Required="true">
+                        <MudSelectItem T="string" Value="@("Muslim")">Muslim</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Non-Muslim")">Non-Muslim</MudSelectItem>
+                    </MudSelect>
+                    
+                    <MudTextField T="string" Value="@FormatDateDisplay(DobValue)"
+                                  ValueChanged="@((string v) => OnSmartDateChanged(v, d => { student.DateOfBirth = d ?? DateTime.Today.AddYears(-15); OnDobChanged(); }))"
+                                  Label="Date of Birth" Variant="Variant.Outlined" Class="compact-field date-smart-input"
+                                  Required="true" Placeholder="01-Jan-2010" Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.CalendarToday" OnAdornmentClick="@(() => ShowDatePicker("dob"))" />
+                </div>
+
+                <div class="compact-grid-2">
+                    <MudTextField T="string" Value="@student.DateOfBirthWords" Label="DOB in Words"
+                                  Variant="Variant.Outlined" Class="compact-field" ReadOnly="true"
+                                  Style="text-transform: uppercase;" />
+                    
+                    <MudTextField T="string" @bind-Value="student.IdentificationMark" @bind-Value:after="MarkDirty"
+                                  Label="Identification Mark" Variant="Variant.Outlined" Class="compact-field"
+                                  Required="true" Style="text-transform: uppercase;" />
+                </div>
+
+                @if (dobAgeWarning)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="alert-compact" Style="margin-bottom: 16px;">
+                        Age must be 10-35 years
+                    </MudAlert>
+                }
+
+                <div class="compact-grid-2">
+                    <MudTextField T="string" @bind-Value="student.MobileNumber" @bind-Value:after="OnMobileChanged"
+                                  Label="Mobile No" Variant="Variant.Outlined" Class="compact-field"
+                                  MaxLength="12" HelperText="03XX-XXXXXXX" InputType="InputType.Telephone" />
+                    
+                    <MudTextField T="string" @bind-Value="student.Address" @bind-Value:after="MarkDirty"
+                                  Label="Permanent Address" Variant="Variant.Outlined" Class="compact-field" />
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <MudText Typo="Typo.caption" Style="font-weight: 500; margin-bottom: 8px; font-size: 13px;">Medium of Instruction *</MudText>
+                    <div class="medium-button-group">
+                        <div class="medium-btn @(student.Medium == "Urdu" ? "active" : "")" @onclick='() => SetMedium("Urdu")'>
+                            📖 Urdu
+                        </div>
+                        <div class="medium-btn @(student.Medium == "Sindhi" ? "active" : "")" @onclick='() => SetMedium("Sindhi")'>
+                            📚 Sindhi
+                        </div>
+                        <div class="medium-btn @(student.Medium == "English" ? "active" : "")" @onclick='() => SetMedium("English")'>
+                            📕 English
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="doc-section-body">
 
-                <!-- Row 1: Session | Class | Group | Category (Locked on FRESH for Science/Pre-Med/Pre-Eng) -->
-                <div class="f-grid f-cols-4">
-                    <div class="float-group floating">
-                        <input class="float-input" value="@activeYearName" readonly placeholder=" " />
-                        <label class="float-label">Academic Session</label>
-                    </div>
-
-                    <div class="float-group floating">
-                        <select class="float-select" @bind="student.ClassLevel" @bind:after="OnClassLevelChanged">
-                            <option value="SSC-I 1ST ANNUAL">SSC-I 1ST ANNUAL</option>
-                            <option value="SSC-II 2ND ANNUAL">SSC-II 2ND ANNUAL</option>
-                            <option value="HSC-I 1ST ANNUAL">HSC-I 1ST ANNUAL</option>
-                            <option value="HSC-II 2ND ANNUAL">HSC-II 2ND ANNUAL</option>
-                        </select>
-                        <label class="float-label required">Class Level</label>
-                    </div>
-
-                    <div class="float-group floating">
-                        <select class="float-select" @bind="student.Group" @bind:after="OnGroupChanged">
-                            @foreach (var g in GetGroupsForClass(student.ClassLevel))
-                            {
-                                <option value="@g">@g</option>
-                            }
-                        </select>
-                        <label class="float-label required">Study Group</label>
-                    </div>
-
-                    <div class="float-group floating">
-                        @if (IsStudentTypeLocked(student.ClassLevel, student.Group))
+            <div>
+                <label for="photoFileInput" style="cursor: pointer;">
+                    <div class="photo-upload-compact">
+                        @if (!string.IsNullOrEmpty(photoPreviewBase64))
                         {
-                            <input class="float-input" value="FRESH" readonly placeholder=" " title="Locked to FRESH for this study group" />
+                            <img src="@photoPreviewBase64" alt="Photo" />
                         }
                         else
                         {
-                            <select class="float-select" @bind="student.StudentType">
-                                <option value="FRESH">FRESH</option>
-                                <option value="REPEATER">REPEATER</option>
-                                <option value="REAPPEAR">REAPPEAR</option>
-                                <option value="PRIVATE">PRIVATE</option>
-                            </select>
+                            <div style="text-align: center;">
+                                <MudIcon Icon="@Icons.Material.Filled.PhotoCamera" Size="Size.Large" Color="Color.Secondary" />
+                                <div style="font-size: 11px; color: #666; margin-top: 6px;">35×45mm<br/>Max 2MB<br/>Click to upload</div>
+                            </div>
                         }
-                        <label class="float-label required">Category</label>
                     </div>
-                </div>
-
-                <!-- Extra HSC SSC-II Seat Lookup Row when HSC Level is selected -->
-                @if (IsHscLevel(student.ClassLevel))
+                </label>
+                <InputFile id="photoFileInput" OnChange="OnPhotoSelected" accept="image/jpeg,image/png,image/webp" style="display:none;" />
+                @if (!string.IsNullOrEmpty(photoPreviewBase64))
                 {
-                    <div style="background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 6px; padding: 14px 16px; margin-bottom: 18px;">
-                        <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
-                            <div class="float-group floating" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                                <input class="float-input" type="text" value="@prevSeatNo" @oninput="OnPrevSeatNoInput" maxlength="10" placeholder=" " />
-                                <label class="float-label required">Previous Seat No (SSC-II Roll #)</label>
-                            </div>
-                            <div class="float-group floating" style="width: 140px; margin-bottom: 0;">
-                                <select class="float-select" @bind="prevPassingYear">
-                                    <option value="2025">2025</option>
-                                    <option value="2024">2024</option>
-                                    <option value="2023">2023</option>
-                                    <option value="2022">2022</option>
-                                    <option value="2021">2021</option>
-                                    <option value="2020">2020</option>
-                                </select>
-                                <label class="float-label required">Passing Year</label>
-                            </div>
-                            <div>
-                                <button type="button" class="btn btn-primary" @onclick="FetchPreviousSscRecord" style="height: 44px; font-size: 0.85rem; font-weight: 700; padding: 0 18px;">
-                                    🔍 Fetch Record
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" FullWidth="true" OnClick="ClearPhoto" Style="margin-top: 10px; font-size: 12px;">
+                        Remove Photo
+                    </MudButton>
                 }
-
-                <!-- Row 2: GR No | Admission Date | Enrollment No | Eligibility No -->
-                <div class="f-grid f-cols-4">
-                    <div class="float-group @(!string.IsNullOrEmpty(student.GrNumber) ? "floating" : "")">
-                        <input class="float-input" type="text" @bind="student.GrNumber" placeholder=" " />
-                        <label class="float-label required">G.R / Admission No</label>
-                    </div>
-
-                    <div class="float-group floating">
-                        <input class="float-input" type="date" @bind="student.AdmissionDate" placeholder=" " />
-                        <label class="float-label">Admission Date</label>
-                    </div>
-
-                    <div class="float-group @(!string.IsNullOrEmpty(student.BoardRegNo) ? "floating" : "")">
-                        <input class="float-input" type="text" @bind="student.BoardRegNo" placeholder=" " />
-                        <label class="float-label">Enrollment / Reg No</label>
-                    </div>
-
-                    <div class="float-group @(!string.IsNullOrEmpty(student.EligibilityNo) ? "floating" : "")">
-                        <input class="float-input caps-field" type="text" @bind="student.EligibilityNo" placeholder=" " />
-                        <label class="float-label">Eligibility No</label>
-                    </div>
-                </div>
-
-                <!-- Row 3: Previous Board | Board Name | Board Passing Date -->
-                <div class="f-grid f-cols-3">
-                    <div class="float-group floating">
-                        <select class="float-select" @bind="selectedPreviousBoard" @bind:after="OnPreviousBoardChanged">
-                            <option value="BISE Sukkur">BISE Sukkur</option>
-                            <option value="Other">Other Board</option>
-                        </select>
-                        <label class="float-label">Previous Board</label>
-                    </div>
-
-                    @if (selectedPreviousBoard == "Other")
-                    {
-                        <div class="float-group @(!string.IsNullOrEmpty(student.PreviousBoard) ? "floating" : "")">
-                            <input class="float-input caps-field" type="text" value="@student.PreviousBoard" @oninput="OnPreviousBoardInput" placeholder=" " />
-                            <label class="float-label">Other Board Name</label>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="float-group floating">
-                            <input class="float-input" value="BISE Sukkur" readonly placeholder=" " />
-                            <label class="float-label">Board Name</label>
-                        </div>
-                    }
-
-                    <div class="float-group floating">
-                        <input class="float-input" type="date" @bind="student.BoardPassingDate" placeholder=" " />
-                        <label class="float-label">Board Passing Date</label>
-                    </div>
-                </div>
-
             </div>
         </div>
 
-        <!-- ══════════ 2. CANDIDATE BIO DATA ══════════ -->
-        <div class="doc-section">
-            <div class="doc-section-header">
-                <span>2. Candidate Bio Data</span>
-                <span style="font-size: 0.72rem; color: #64748b; font-weight: normal;">Demographic & Identity Record</span>
-            </div>
-            <div class="doc-section-body">
-                <div class="bio-grid-wrap">
-
-                    <!-- LEFT INPUT FIELDS -->
-                    <div>
-                        <!-- Row 1: Candidate Full Name | CNIC -->
-                        <div class="f-grid f-cols-2">
-                            <div class="float-group @(!string.IsNullOrEmpty(student.StudentName) ? "floating" : "")">
-                                <input class="float-input caps-field" type="text" value="@student.StudentName" @oninput="OnStudentNameInput" placeholder=" " />
-                                <label class="float-label required">Candidate Full Name</label>
-                            </div>
-
-                            <div class="float-group @(!string.IsNullOrEmpty(student.Cnic) ? "floating" : "")">
-                                <input class="float-input" type="text" 
-                                       value="@student.Cnic" 
-                                       @oninput="OnCnicInput" 
-                                       maxlength="15" 
-                                       placeholder=" " />
-                                <label class="float-label required">CNIC / B-Form No (XXXXX-XXXXXXX-X)</label>
-                            </div>
-                        </div>
-
-                        <!-- Row 2: Father Name | Father CNIC -->
-                        <div class="f-grid f-cols-2">
-                            <div class="float-group @(!string.IsNullOrEmpty(student.FatherName) ? "floating" : "")">
-                                <input class="float-input caps-field" type="text" value="@student.FatherName" @oninput="OnFatherNameInput" placeholder=" " />
-                                <label class="float-label required">Father's Full Name</label>
-                            </div>
-
-                            <div class="float-group @(!string.IsNullOrEmpty(student.FatherCnic) ? "floating" : "")">
-                                <input class="float-input" type="text" 
-                                       value="@student.FatherCnic" 
-                                       @oninput="OnFatherCnicInput" 
-                                       maxlength="15" 
-                                       placeholder=" " />
-                                <label class="float-label">Father's CNIC (XXXXX-XXXXXXX-X)</label>
-                            </div>
-                        </div>
-
-                        <!-- Row 3: Surname | Gender | Religion (Religion after Gender) -->
-                        <div class="f-grid f-cols-3">
-                            <div class="float-group @(!string.IsNullOrEmpty(student.Surname) ? "floating" : "")">
-                                <input class="float-input caps-field" type="text" value="@student.Surname" @oninput="OnSurnameInput" placeholder=" " />
-                                <label class="float-label required">Surname / Caste</label>
-                            </div>
-
-                            <div class="float-group floating">
-                                <select class="float-select" @bind="student.Gender">
-                                    <option value="">Select Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                                <label class="float-label required">Gender</label>
-                            </div>
-
-                            <div class="float-group floating">
-                                <select class="float-select" @bind="student.Religion">
-                                    <option value="Muslim">Muslim</option>
-                                    <option value="Non-Muslim">Non-Muslim</option>
-                                </select>
-                                <label class="float-label required">Religion</label>
-                            </div>
-                        </div>
-
-                        <!-- Row 4: DOB | DOB in Words -->
-                        <div class="f-grid f-cols-2">
-                            <div class="float-group floating">
-                                <input class="float-input" type="date" @bind="student.DateOfBirth" @bind:after="OnDobChanged" placeholder=" " />
-                                <label class="float-label required">Date of Birth</label>
-                            </div>
-
-                            <div class="float-group floating">
-                                <input class="float-input caps-field" type="text" value="@student.DateOfBirthWords" readonly placeholder=" " />
-                                <label class="float-label">DOB in Words</label>
-                            </div>
-                        </div>
-
-                        @if (dobAgeWarning)
-                        {
-                            <div class="d-alert-error">
-                                ⚠️ Candidate age must be between 10 and 35 years.
-                            </div>
-                        }
-
-                        <!-- Row 5: Identification Mark | Mobile No -->
-                        <div class="f-grid f-cols-2">
-                            <div class="float-group @(!string.IsNullOrEmpty(student.IdentificationMark) ? "floating" : "")">
-                                <input class="float-input caps-field" type="text" value="@student.IdentificationMark" @oninput="OnIdentificationMarkInput" placeholder=" " />
-                                <label class="float-label required">Identification Mark</label>
-                            </div>
-
-                            <div class="float-group @(!string.IsNullOrEmpty(student.MobileNumber) ? "floating" : "")">
-                                <input class="float-input" type="tel" 
-                                       value="@student.MobileNumber" 
-                                       @oninput="OnMobileInput" 
-                                       maxlength="12" 
-                                       placeholder=" " />
-                                <label class="float-label">Mobile No (03XX-XXXXXXX)</label>
-                            </div>
-                        </div>
-
-                        <!-- Row 6: Permanent Address | Medium Toggle -->
-                        <div class="f-grid" style="grid-template-columns: 1.35fr 1fr;">
-                            <div class="float-group @(!string.IsNullOrEmpty(student.Address) ? "floating" : "")">
-                                <input class="float-input" type="text" @bind="student.Address" placeholder=" " />
-                                <label class="float-label">Permanent Address</label>
-                            </div>
-
-                            <div class="medium-toggle-box">
-                                <span class="medium-toggle-label">Medium *</span>
-                                <div class="medium-toggle-group">
-                                    <button type="button" class="medium-btn @(student.Medium == "Urdu" ? "active" : "")" @onclick='() => student.Medium = "Urdu"'>Urdu</button>
-                                    <button type="button" class="medium-btn @(student.Medium == "Sindhi" ? "active" : "")" @onclick='() => student.Medium = "Sindhi"'>Sindhi</button>
-                                    <button type="button" class="medium-btn @(student.Medium == "English" ? "active" : "")" @onclick='() => student.Medium = "English"'>English</button>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <!-- RIGHT PHOTO CARD -->
-                    <div class="photo-box-wrap">
-                        <label for="photoFileInput" class="photo-card" title="Click to upload passport photo">
-                            @if (!string.IsNullOrEmpty(photoPreviewBase64))
-                            {
-                                <img src="@photoPreviewBase64" alt="Photo" style="width:100%;height:100%;object-fit:cover;" />
-                            }
-                            else
-                            {
-                                <div class="photo-placeholder">
-                                    📷<br />PASSPORT<br />PHOTO<br /><span style="font-size: 0.6rem; color: #94a3b8;">Click to upload</span>
-                                </div>
-                            }
-                        </label>
-                        <InputFile id="photoFileInput" OnChange="OnPhotoSelected" accept="image/jpeg,image/png,image/webp" style="display:none;" />
-                        @if (!string.IsNullOrEmpty(photoPreviewBase64))
-                        {
-                            <button type="button" class="btn btn-secondary btn-sm" @onclick="ClearPhoto" style="width:100%;margin-top:6px;font-size:0.7rem;padding:3px 0;">Remove Photo</button>
-                        }
-                        <div style="font-size: 0.65rem; color: #94a3b8; text-align: center; margin-top: 6px;">35×45mm · Max 2MB</div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <!-- ══════════ ACTION BAR (CENTERED SUBMIT) ══════════ -->
-        <div class="d-action-bar">
-            <button type="button" class="btn-submit-enroll" @onclick="() => HandleSave(true)" disabled="@isSaving">
+        <div class="submit-section">
+            <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Large"
+                       OnClick="ShowPreviewDialog" StartIcon="@Icons.Material.Filled.Preview"
+                       Style="margin-right: 16px; padding: 12px 32px; font-size: 15px; font-weight: 600;">
+                Preview
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large"
+                       Disabled="@isSaving" OnClick="() => HandleSave(true)"
+                       StartIcon="@Icons.Material.Filled.CheckCircle" Class="submit-btn">
                 @(isSaving ? "Submitting..." : "Submit Enrollment")
-            </button>
+            </MudButton>
         </div>
+    </div>
 
+    <div style="text-align: center; margin-top: 12px;">
+        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.ArrowBack" Href="school/enrollments">
+            Back to Enrollment List
+        </MudButton>
     </div>
 </div>
+
+<!-- Preview Dialog Modal -->
+<MudDialog @bind-IsVisible="showPreviewDialog" Options="previewDialogOptions" ClassActions="pa-4">
+    <TitleContent>
+        <MudText Typo="Typo.h5" Style="font-weight: 700;">📋 Preview Enrollment Details</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="preview-section">
+            <div class="preview-section-title">📚 Academic Information</div>
+            <div class="preview-grid">
+                <div class="preview-item">
+                    <span class="preview-label">Session:</span>
+                    <span class="preview-value">@activeYearName</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Class Level:</span>
+                    <span class="preview-value">@student.ClassLevel</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Study Group:</span>
+                    <span class="preview-value">@student.Group</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Category:</span>
+                    <span class="preview-value">@student.StudentType</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">G.R Number:</span>
+                    <span class="preview-value">@student.GrNumber</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Admission Date:</span>
+                    <span class="preview-value">@FormatDateDisplay(student.AdmissionDate)</span>
+                </div>
+                @if (!string.IsNullOrEmpty(student.BoardRegNo))
+                {
+                    <div class="preview-item">
+                        <span class="preview-label">Enrollment No:</span>
+                        <span class="preview-value">@student.BoardRegNo</span>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(student.EligibilityNo))
+                {
+                    <div class="preview-item">
+                        <span class="preview-label">Eligibility No:</span>
+                        <span class="preview-value">@student.EligibilityNo</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <div class="preview-section-title">👤 Candidate Bio Data</div>
+            <div class="preview-grid">
+                <div class="preview-item">
+                    <span class="preview-label">Full Name:</span>
+                    <span class="preview-value">@student.StudentName</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">CNIC / B-Form:</span>
+                    <span class="preview-value">@student.Cnic</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Father's Name:</span>
+                    <span class="preview-value">@student.FatherName</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Father's CNIC:</span>
+                    <span class="preview-value">@(student.FatherCnic ?? "-")</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Surname / Caste:</span>
+                    <span class="preview-value">@student.Surname</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Gender:</span>
+                    <span class="preview-value">@student.Gender</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Date of Birth:</span>
+                    <span class="preview-value">@FormatDateDisplay(student.DateOfBirth)</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">DOB in Words:</span>
+                    <span class="preview-value">@student.DateOfBirthWords</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Religion:</span>
+                    <span class="preview-value">@student.Religion</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Medium:</span>
+                    <span class="preview-value">@student.Medium</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Identification Mark:</span>
+                    <span class="preview-value">@student.IdentificationMark</span>
+                </div>
+                <div class="preview-item">
+                    <span class="preview-label">Mobile Number:</span>
+                    <span class="preview-value">@(student.MobileNumber ?? "-")</span>
+                </div>
+                @if (!string.IsNullOrEmpty(student.Address))
+                {
+                    <div class="preview-item" style="grid-column: span 2;">
+                        <span class="preview-label">Address:</span>
+                        <span class="preview-value">@student.Address</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(photoPreviewBase64))
+        {
+            <div class="preview-section">
+                <div class="preview-section-title">📸 Passport Photograph</div>
+                <div style="text-align: center;">
+                    <img src="@photoPreviewBase64" alt="Passport Photo" style="max-width: 150px; border-radius: 8px; border: 2px solid #e0e0e0;" />
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" Variant="Variant.Text" OnClick="ClosePreviewDialog">Close</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="() => { ClosePreviewDialog(); HandleSave(true); }" 
+                   StartIcon="@Icons.Material.Filled.CheckCircle">
+            Confirm & Submit
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-IsVisible="showDatePickerDialog" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Select Date</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudDatePicker @bind-Date="tempDate" DateFormat="dd-MMM-yyyy" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelDatePicker">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="ConfirmDatePicker">OK</MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     [Parameter] public int? Id { get; set; }
@@ -680,6 +688,7 @@
     private string? successMessage;
     private bool isSaving = false;
     private bool dobAgeWarning = false;
+    private bool showPreviewDialog = false;
     private string activeYearName = "2025 – 2026";
     private string selectedPreviousBoard = "BISE Sukkur";
     private string? photoPreviewBase64;
@@ -691,9 +700,127 @@
     private bool _isDirty;
     private IDisposable? _locationChangingRegistration;
 
-    // HSC Previous Record Lookup
     private string prevSeatNo = "";
     private string prevPassingYear = "2025";
+
+    // Date picker dialog
+    private bool showDatePickerDialog = false;
+    private DateTime? tempDate;
+    private string currentDateField = "";
+    private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    private DialogOptions previewDialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+
+    private DateTime? DobValue => student.DateOfBirth == default ? null : student.DateOfBirth;
+
+    private void ShowPreviewDialog()
+    {
+        showPreviewDialog = true;
+        StateHasChanged();
+    }
+
+    private void ClosePreviewDialog()
+    {
+        showPreviewDialog = false;
+        StateHasChanged();
+    }
+
+    private void ShowDatePicker(string field)
+    {
+        currentDateField = field;
+        tempDate = field switch
+        {
+            "dob" => student.DateOfBirth,
+            "admission" => student.AdmissionDate,
+            "boardPassing" => student.BoardPassingDate,
+            _ => DateTime.Today
+        };
+        showDatePickerDialog = true;
+    }
+
+    private void ConfirmDatePicker()
+    {
+        if (tempDate.HasValue)
+        {
+            switch (currentDateField)
+            {
+                case "dob":
+                    student.DateOfBirth = tempDate.Value;
+                    OnDobChanged();
+                    break;
+                case "admission":
+                    student.AdmissionDate = tempDate;
+                    break;
+                case "boardPassing":
+                    student.BoardPassingDate = tempDate;
+                    break;
+            }
+            MarkDirty();
+        }
+        showDatePickerDialog = false;
+    }
+
+    private void CancelDatePicker()
+    {
+        showDatePickerDialog = false;
+    }
+
+    private string FormatDateDisplay(DateTime? date)
+    {
+        if (date == null) return "";
+        return date.Value.ToString("dd-MMM-yyyy");
+    }
+
+    private void OnSmartDateChanged(string input, Action<DateTime?> setter)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            setter(null);
+            MarkDirty();
+            return;
+        }
+
+        DateTime parsed;
+        
+        // Format: dd-MMM-yyyy (01-Jan-2010) - Preferred format
+        if (DateTime.TryParseExact(input, "dd-MMM-yyyy", 
+            System.Globalization.CultureInfo.InvariantCulture, 
+            System.Globalization.DateTimeStyles.None, out parsed))
+        {
+            setter(parsed);
+            MarkDirty();
+            return;
+        }
+
+        // Format: ddMMMyyyy (01Jan2010) - Without hyphens
+        if (DateTime.TryParseExact(input, "ddMMMyyyy", 
+            System.Globalization.CultureInfo.InvariantCulture, 
+            System.Globalization.DateTimeStyles.None, out parsed))
+        {
+            setter(parsed);
+            MarkDirty();
+            return;
+        }
+
+        // Format: ddMMyyyy (01012010) - All digits
+        if (input.Length == 8 && DateTime.TryParseExact(input, "ddMMyyyy",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out parsed))
+        {
+            setter(parsed);
+            MarkDirty();
+            return;
+        }
+
+        // Try standard parsing for other formats
+        if (DateTime.TryParse(input, out parsed))
+        {
+            setter(parsed);
+            MarkDirty();
+            return;
+        }
+
+        // Invalid format - don't update
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -777,11 +904,13 @@
     {
         student.Group = GetGroupsForClass(student.ClassLevel).First();
         EnforceStudentTypeRule();
+        MarkDirty();
     }
 
     private void OnGroupChanged()
     {
         EnforceStudentTypeRule();
+        MarkDirty();
     }
 
     private void EnforceStudentTypeRule()
@@ -796,6 +925,12 @@
         }
     }
 
+    private void SetMedium(string medium)
+    {
+        student.Medium = medium;
+        MarkDirty();
+    }
+
     private async Task FetchPreviousSscRecord()
     {
         errorMessage = null;
@@ -807,14 +942,16 @@
             return;
         }
 
+        prevSeatNo = FilterDigitsOnly(prevSeatNo, 10);
+
         var old = await EnrollmentService.LookupPreviousSscRecordAsync(prevSeatNo, prevPassingYear);
         if (old != null)
         {
             student.StudentName = old.StudentName.ToUpperInvariant();
             student.FatherName = old.FatherName?.ToUpperInvariant();
-            student.FatherCnic = old.FatherCnic;
+            student.FatherCnic = FormatCnic(old.FatherCnic);
             student.Surname = old.Surname?.ToUpperInvariant();
-            student.Cnic = old.Cnic;
+            student.Cnic = FormatCnic(old.Cnic);
             student.DateOfBirth = old.DateOfBirth;
             student.DateOfBirthWords = old.DateOfBirthWords ?? DateToWords(old.DateOfBirth);
             student.Gender = old.Gender;
@@ -822,12 +959,13 @@
             student.Medium = old.Medium;
             student.Address = old.Address;
             student.IdentificationMark = old.IdentificationMark?.ToUpperInvariant();
-            student.MobileNumber = old.MobileNumber;
+            student.MobileNumber = FormatMobile(old.MobileNumber);
             student.BoardRegNo = old.EnrollmentNumber ?? old.BoardRegNo ?? prevSeatNo;
             student.PreviousBoard = "BISE Sukkur";
             selectedPreviousBoard = "BISE Sukkur";
 
             successMessage = $"Record fetched successfully for candidate '{student.StudentName}' (SSC Roll #{prevSeatNo}).";
+            MarkDirty();
         }
         else
         {
@@ -839,6 +977,29 @@
     {
         if (selectedPreviousBoard == "BISE Sukkur")
             student.PreviousBoard = "BISE Sukkur";
+        MarkDirty();
+    }
+
+    private void OnAdmissionDateChanged(DateTime? value)
+    {
+        student.AdmissionDate = value;
+        MarkDirty();
+    }
+
+    private void OnBoardPassingDateChanged(DateTime? value)
+    {
+        student.BoardPassingDate = value;
+        MarkDirty();
+    }
+
+    private void OnDobPicked(DateTime? value)
+    {
+        if (value.HasValue)
+        {
+            student.DateOfBirth = value.Value;
+            OnDobChanged();
+        }
+        MarkDirty();
     }
 
     private void OnDobChanged()
@@ -852,12 +1013,10 @@
         student.DateOfBirthWords = DateToWords(dob);
     }
 
-    /* Text-only and Digits-only filtering helpers */
     private static string FilterTextOnly(string? input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
-        // Allow letters, spaces, dots, hyphens, and apostrophes only (no digits)
-        return Regex.Replace(input, @"[^a-zA-Z\s\.\-']", "");
+        return Regex.Replace(input, @"[^a-zA-Z\s\.\-']", "").ToUpperInvariant();
     }
 
     private static string FilterDigitsOnly(string? input, int maxLen = 20)
@@ -867,43 +1026,6 @@
         return digits.Length > maxLen ? digits[..maxLen] : digits;
     }
 
-    private void OnStudentNameInput(ChangeEventArgs e)
-    {
-        student.StudentName = FilterTextOnly(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    private void OnFatherNameInput(ChangeEventArgs e)
-    {
-        student.FatherName = FilterTextOnly(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    private void OnSurnameInput(ChangeEventArgs e)
-    {
-        student.Surname = FilterTextOnly(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    private void OnIdentificationMarkInput(ChangeEventArgs e)
-    {
-        student.IdentificationMark = FilterTextOnly(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    private void OnPreviousBoardInput(ChangeEventArgs e)
-    {
-        student.PreviousBoard = FilterTextOnly(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    private void OnPrevSeatNoInput(ChangeEventArgs e)
-    {
-        prevSeatNo = FilterDigitsOnly(e.Value?.ToString(), 10);
-        MarkDirty();
-    }
-
-    /* Auto-formatting CNIC: XXXXX-XXXXXXX-X */
     private static string FormatCnic(string? input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
@@ -914,19 +1036,6 @@
         return $"{digits[..5]}-{digits[5..12]}-{digits[12..]}";
     }
 
-    private void OnCnicInput(ChangeEventArgs e)
-    {
-        student.Cnic = FormatCnic(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    private void OnFatherCnicInput(ChangeEventArgs e)
-    {
-        student.FatherCnic = FormatCnic(e.Value?.ToString());
-        MarkDirty();
-    }
-
-    /* Auto-formatting Mobile: 03XX-XXXXXXX */
     private static string FormatMobile(string? input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
@@ -936,9 +1045,21 @@
         return $"{digits[..4]}-{digits[4..]}";
     }
 
-    private void OnMobileInput(ChangeEventArgs e)
+    private void OnCnicChanged()
     {
-        student.MobileNumber = FormatMobile(e.Value?.ToString());
+        student.Cnic = FormatCnic(student.Cnic);
+        MarkDirty();
+    }
+
+    private void OnFatherCnicChanged()
+    {
+        student.FatherCnic = FormatCnic(student.FatherCnic);
+        MarkDirty();
+    }
+
+    private void OnMobileChanged()
+    {
+        student.MobileNumber = FormatMobile(student.MobileNumber);
         MarkDirty();
     }
 
@@ -1046,10 +1167,28 @@
         _locationChangingRegistration?.Dispose();
     }
 
+    private void NormalizeForSave()
+    {
+        student.StudentName = FilterTextOnly(student.StudentName);
+        student.FatherName = FilterTextOnly(student.FatherName);
+        student.Surname = FilterTextOnly(student.Surname);
+        student.IdentificationMark = FilterTextOnly(student.IdentificationMark);
+        student.EligibilityNo = student.EligibilityNo?.ToUpperInvariant();
+        if (selectedPreviousBoard == "Other")
+            student.PreviousBoard = FilterTextOnly(student.PreviousBoard);
+        else
+            student.PreviousBoard = "BISE Sukkur";
+        student.Cnic = FormatCnic(student.Cnic);
+        student.FatherCnic = FormatCnic(student.FatherCnic);
+        student.MobileNumber = FormatMobile(student.MobileNumber);
+        prevSeatNo = FilterDigitsOnly(prevSeatNo, 10);
+    }
+
     private async Task HandleSave(bool finalize)
     {
         errorMessage = null;
         successMessage = null;
+        NormalizeForSave();
 
         if (string.IsNullOrWhiteSpace(student.StudentName))
         { errorMessage = "Candidate Full Name is required."; return; }
@@ -1069,7 +1208,6 @@
         isSaving = true;
         try
         {
-            if (selectedPreviousBoard != "Other") student.PreviousBoard = "BISE Sukkur";
             student.SubjectsJson = "[]";
             var savedName = student.StudentName;
             var savedCnic = student.Cnic;
@@ -1095,24 +1233,45 @@
 
             if (isEdit)
             {
-                Snackbar.Add($"Candidate '{savedName}' record updated successfully!", Severity.Success);
-                ToastService.ShowSuccess($"Candidate '{savedName}' record updated successfully!", "Enrollment Updated", 7000);
+                // Show top-right success snackbar for 6 seconds
+                Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopEnd;
+                Snackbar.Configuration.SnackbarVariant = Variant.Filled;
+                Snackbar.Add($"✓ Candidate '{savedName}' record updated successfully!", Severity.Success, config =>
+                {
+                    config.VisibleStateDuration = 6000;
+                    config.ShowCloseIcon = true;
+                });
+                
+                await Task.Delay(1500);
                 Navigation.NavigateTo("school/enrollments");
             }
             else
             {
-                // Continuous entry mode - show toast notification AND persistent in-page banner
-                Snackbar.Add($"Candidate '{savedName}' ({savedCnic}) successfully enrolled!", Severity.Success);
-                ToastService.ShowSuccess($"Candidate '{savedName}' ({savedCnic}) successfully enrolled! Form is ready for the next entry.", "Enrollment Submitted", 7000);
+                // Show top-right success snackbar for 6 seconds
+                Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopEnd;
+                Snackbar.Configuration.SnackbarVariant = Variant.Filled;
+                Snackbar.Add($"✓ Candidate '{savedName}' ({savedCnic}) successfully enrolled! Form is ready for the next entry.", Severity.Success, config =>
+                {
+                    config.VisibleStateDuration = 6000;
+                    config.ShowCloseIcon = true;
+                });
+                
                 ResetFormForNextStudent();
-                successMessage = $"✓ Candidate '{savedName}' ({savedCnic}) successfully enrolled! Form is cleared and ready for the next entry.";
+                successMessage = $"Candidate '{savedName}' ({savedCnic}) successfully enrolled. Form is ready for the next entry.";
             }
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message;
-            Snackbar.Add(ex.Message, Severity.Error);
-            ToastService.ShowError(ex.Message, "Save Failed", 7000);
+            
+            // Show error snackbar
+            Snackbar.Configuration.PositionClass = Defaults.Classes.Position.TopEnd;
+            Snackbar.Configuration.SnackbarVariant = Variant.Filled;
+            Snackbar.Add($"✗ {ex.Message}", Severity.Error, config =>
+            {
+                config.VisibleStateDuration = 6000;
+                config.ShowCloseIcon = true;
+            });
         }
         finally
         {

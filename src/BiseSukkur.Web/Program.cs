@@ -18,7 +18,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor;
 using MudBlazor.Services;
@@ -191,7 +191,16 @@ builder.Services.AddRazorComponents()
     {
         options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(10);
         options.DisconnectedCircuitMaxRetained = 500;
+        options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
     });
+
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 1024 * 1024;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+});
 
 var app = builder.Build();
 

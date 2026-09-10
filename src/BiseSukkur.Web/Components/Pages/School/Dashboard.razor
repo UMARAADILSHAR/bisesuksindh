@@ -18,47 +18,48 @@
 }
 else
 {
-    <!-- Premium KPI Cards Row -->
-    <MudGrid Spacing="3" Class="mb-6">
-        <MudItem xs="12" sm="6" md="3">
-            <KpiCard Title="Enrolled Candidates"
-                     Value="@(stats?.TotalEnrollments.ToString() ?? "0")"
-                     Subtitle="@($"SSC-I: {stats?.Ssc1Enrollments ?? 0}  ·  HSC-I: {stats?.Hsc1Enrollments ?? 0}")"
-                     DecorativeIcon="@Icons.Material.Filled.People"
-                     Variant="blue"
-                     IsLoading="@(stats == null)" />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <KpiCard Title="Exam Form Entries"
-                     Value="@(stats?.TotalExams.ToString() ?? "0")"
-                     Subtitle="@($"SSC-II: {stats?.Ssc2Exams ?? 0}  ·  HSC-II: {stats?.Hsc2Exams ?? 0}")"
-                     DecorativeIcon="@Icons.Material.Filled.Assignment"
-                     Variant="emerald"
-                     IsLoading="@(stats == null)" />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <KpiCard Title="Pending Invoices"
-                     Value="@($"Rs. {(stats?.PendingInvoicesAmount ?? 0):N0}")"
-                     Subtitle="Awaiting Bank Deposit"
-                     DecorativeIcon="@Icons.Material.Filled.AccountBalanceWallet"
-                     Variant="amber"
-                     IsMono="true"
-                     IsLoading="@(stats == null)" />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <KpiCard Title="Reconciled Revenue"
-                     Value="@($"Rs. {(stats?.PaidInvoicesAmount ?? 0):N0}")"
-                     Subtitle="Verified Bank Receipts"
-                     DecorativeIcon="@Icons.Material.Filled.Verified"
-                     Variant="purple"
-                     IsMono="true"
-                     IsLoading="@(stats == null)" />
-        </MudItem>
-    </MudGrid>
+    <!-- 2x2 Compact KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 13px; opacity: 0.9; margin-bottom: 4px;">Enrolled Candidates</div>
+                    <div style="font-size: 32px; font-weight: 700; line-height: 1;">@(stats?.TotalEnrollments ?? 0)</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Style="opacity: 0.3;" />
+            </div>
+        </div>
 
-    <!-- Deadline Timeline Widget -->
-    <DeadlineTimeline EnrollmentWindow="@stats?.EnrollmentWindow"
-                      ExamWindow="@stats?.ExamWindow" />
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 13px; opacity: 0.9; margin-bottom: 4px;">Exam Form Entries</div>
+                    <div style="font-size: 32px; font-weight: 700; line-height: 1;">@(stats?.TotalExams ?? 0)</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Large" Style="opacity: 0.3;" />
+            </div>
+        </div>
+
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 13px; opacity: 0.9; margin-bottom: 4px;">Pending Invoices</div>
+                    <div style="font-size: 28px; font-weight: 700; line-height: 1; font-family: monospace;">Rs. @((stats?.PendingInvoicesAmount ?? 0).ToString("N0"))</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Large" Style="opacity: 0.3;" />
+            </div>
+        </div>
+
+        <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="font-size: 13px; opacity: 0.9; margin-bottom: 4px;">Reconciled Revenue</div>
+                    <div style="font-size: 28px; font-weight: 700; line-height: 1; font-family: monospace;">Rs. @((stats?.PaidInvoicesAmount ?? 0).ToString("N0"))</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Large" Style="opacity: 0.3;" />
+            </div>
+        </div>
+    </div>
 
     <!-- Class-wise Enrollment & Exam Progress Table -->
     <div class="card-surface" style="padding: 0; overflow: hidden; margin-top: 1.5rem;">

@@ -7,8 +7,9 @@
             <input type="text"
                    class="form-control filter-search-input"
                    placeholder="@Placeholder"
-                   value="@SearchTerm"
-                   @oninput="HandleInput" />
+                   @bind="SearchTerm"
+                   @bind:event="onchange"
+                   @bind:after="NotifySearch" />
         </div>
         @if (Filters != null)
         {
@@ -26,9 +27,8 @@
     [Parameter] public EventCallback OnSearch { get; set; }
     [Parameter] public RenderFragment? Filters { get; set; }
 
-    private async Task HandleInput(ChangeEventArgs e)
+    private async Task NotifySearch()
     {
-        SearchTerm = e.Value?.ToString() ?? "";
         await SearchTermChanged.InvokeAsync(SearchTerm);
         await OnSearch.InvokeAsync();
     }

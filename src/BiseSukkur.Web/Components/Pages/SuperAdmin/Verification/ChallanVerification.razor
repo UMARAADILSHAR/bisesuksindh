@@ -19,7 +19,7 @@
 <div class="card-surface" style="padding: 1rem 1.25rem;">
     <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
         <div style="flex: 1; min-width: 250px;">
-            <input type="text" class="form-control" placeholder="Search by invoice # (e.g. KH1-001-001) or school name..." @bind="searchTerm" @bind:event="oninput" @bind:after="LoadInvoices" />
+            <input type="text" class="form-control" placeholder="Search by invoice # (e.g. KH1-001-001) or school name..." @bind="searchTerm" @bind:after="LoadInvoices" />
         </div>
         <div style="display: flex; gap: 0.5rem;">
             <button type="button" class="btn @(selectedStatus == null ? "btn-primary" : "btn-secondary") btn-sm" @onclick='() => ChangeStatusFilter(null)'>

@@ -35,35 +35,39 @@
 }
 else
 {
-    <!-- KPI Cards -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem;" class="mb-4 kpi-grid-container">
-        <KpiCard Title="Exam Submissions"
-                 Value="@(metrics?.TotalForms.ToString() ?? "0")"
-                 Subtitle="@($"Part-I: {metrics?.Part1Count ?? 0} | Part-II: {metrics?.Part2Count ?? 0}")"
-                 BadgeText="SUBMITTED"
-                 Variant="blue"
-                 IsLoading="@isLoadingStats" />
+    <!-- Compact Single-Line KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Exam Submissions</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.TotalForms ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
 
-        <KpiCard Title="Admit Slips Issued"
-                 Value="@(metrics?.SlipsIssued.ToString() ?? "0")"
-                 Subtitle="Roll Numbers Allocated"
-                 BadgeText="ISSUED"
-                 Variant="emerald"
-                 IsLoading="@isLoadingStats" />
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Admit Slips Issued</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.SlipsIssued ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
 
-        <KpiCard Title="Pending Slips"
-                 Value="@(metrics?.PendingSlips.ToString() ?? "0")"
-                 Subtitle="Awaiting Center Allocation"
-                 BadgeText="PENDING"
-                 Variant="amber"
-                 IsLoading="@isLoadingStats" />
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Pending Slips</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.PendingSlips ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.PendingActions" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
 
-        <KpiCard Title="Verified Submissions"
-                 Value="@(metrics?.VerifiedCount.ToString() ?? "0")"
-                 Subtitle="Verified by Board"
-                 BadgeText="VERIFIED"
-                 Variant="purple"
-                 IsLoading="@isLoadingStats" />
+        <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 8px; padding: 12px 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);">
+            <div>
+                <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Verified</div>
+                <div style="font-size: 24px; font-weight: 700; line-height: 1; margin-top: 4px;">@(metrics?.VerifiedCount ?? 0)</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Medium" Style="opacity: 0.3;" />
+        </div>
     </div>
 
     <!-- Filters -->
