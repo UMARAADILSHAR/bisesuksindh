@@ -1,0 +1,185 @@
+@if (EnrollmentWindow != null || ExamWindow != null)
+{
+    <div class="deadline-timeline-grid">
+        @if (EnrollmentWindow != null)
+        {
+            <div class="deadline-card deadline-card-enrollment">
+                <div class="deadline-card-header">
+                    <div class="deadline-card-icon-wrap deadline-icon-blue">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="8.5" cy="7" r="4"></circle>
+                            <line x1="20" y1="8" x2="20" y2="14"></line>
+                            <line x1="23" y1="11" x2="17" y2="11"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="deadline-card-title">Enrollment Registration</div>
+                        <div class="deadline-card-session">Academic Session @DateTime.Now.Year</div>
+                    </div>
+                </div>
+
+                @{ var enrollInfo = GetDeadlineInfo(EnrollmentWindow); }
+
+                <div class="deadline-countdown-row">
+                    <div class="countdown-ring-wrapper">
+                        <svg class="countdown-ring" viewBox="0 0 120 120">
+                            <circle class="countdown-ring-bg" cx="60" cy="60" r="52" />
+                            <circle class="countdown-ring-fill @enrollInfo.RingClass" cx="60" cy="60" r="52"
+                                    stroke-dasharray="@enrollInfo.Circumference"
+                                    stroke-dashoffset="@enrollInfo.DashOffset"
+                                    transform="rotate(-90 60 60)" />
+                        </svg>
+                        <div class="countdown-ring-value">
+                            <span class="countdown-number">@enrollInfo.DaysLeft</span>
+                            <span class="countdown-unit">days</span>
+                        </div>
+                    </div>
+                    <div class="deadline-meta">
+                        <div class="deadline-phase-badge @enrollInfo.PhaseClass">
+                            <span class="phase-dot"></span>
+                            @enrollInfo.PhaseText
+                        </div>
+                        <div class="deadline-date-label">
+                            @if (EnrollmentWindow.EndsAt.HasValue)
+                            {
+                                <span>Deadline: <strong>@EnrollmentWindow.EndsAt.Value.ToLocalTime().ToString("dd MMM yyyy")</strong></span>
+                            }
+                            else
+                            {
+                                <span>Scheduled deadline pending</span>
+                            }
+                        </div>
+                        <div class="deadline-progress-bar">
+                            <div class="deadline-progress-fill @enrollInfo.ProgressClass" style="width: @enrollInfo.ProgressPct%"></div>
+                        </div>
+                        <div class="deadline-progress-label">@enrollInfo.ProgressLabel</div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (ExamWindow != null)
+        {
+            <div class="deadline-card deadline-card-exam">
+                <div class="deadline-card-header">
+                    <div class="deadline-card-icon-wrap deadline-icon-emerald">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="deadline-card-title">Examination Forms</div>
+                        <div class="deadline-card-session">Annual Exams @DateTime.Now.Year</div>
+                    </div>
+                </div>
+
+                @{ var examInfo = GetDeadlineInfo(ExamWindow); }
+
+                <div class="deadline-countdown-row">
+                    <div class="countdown-ring-wrapper">
+                        <svg class="countdown-ring" viewBox="0 0 120 120">
+                            <circle class="countdown-ring-bg" cx="60" cy="60" r="52" />
+                            <circle class="countdown-ring-fill @examInfo.RingClass" cx="60" cy="60" r="52"
+                                    stroke-dasharray="@examInfo.Circumference"
+                                    stroke-dashoffset="@examInfo.DashOffset"
+                                    transform="rotate(-90 60 60)" />
+                        </svg>
+                        <div class="countdown-ring-value">
+                            <span class="countdown-number">@examInfo.DaysLeft</span>
+                            <span class="countdown-unit">days</span>
+                        </div>
+                    </div>
+                    <div class="deadline-meta">
+                        <div class="deadline-phase-badge @examInfo.PhaseClass">
+                            <span class="phase-dot"></span>
+                            @examInfo.PhaseText
+                        </div>
+                        <div class="deadline-date-label">
+                            @if (ExamWindow.EndsAt.HasValue)
+                            {
+                                <span>Deadline: <strong>@ExamWindow.EndsAt.Value.ToLocalTime().ToString("dd MMM yyyy")</strong></span>
+                            }
+                            else
+                            {
+                                <span>Scheduled deadline pending</span>
+                            }
+                        </div>
+                        <div class="deadline-progress-bar">
+                            <div class="deadline-progress-fill @examInfo.ProgressClass" style="width: @examInfo.ProgressPct%"></div>
+                        </div>
+                        <div class="deadline-progress-label">@examInfo.ProgressLabel</div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public WindowStatusSummaryDto? EnrollmentWindow { get; set; }
+    [Parameter] public WindowStatusSummaryDto? ExamWindow { get; set; }
+
+    private const double Radius = 52;
+    private static readonly double Circumference = 2 * Math.PI * Radius;
+
+    private record DeadlineDisplayInfo(
+        int DaysLeft,
+        string PhaseText,
+        string PhaseClass,
+        string RingClass,
+        string ProgressClass,
+        double DashOffset,
+        double ProgressPct,
+        string ProgressLabel,
+        string Circumference
+    );
+
+    private DeadlineDisplayInfo GetDeadlineInfo(WindowStatusSummaryDto window)
+    {
+        var phase = window.Phase?.ToLowerInvariant() ?? "normal";
+        var isClosed = phase == "closed" || !window.PortalOpen;
+        var isGrace = phase == "grace";
+
+        int daysLeft = 0;
+        double progressPct = 100;
+        string progressLabel = "Window closed";
+
+        if (window.EndsAt.HasValue && !isClosed)
+        {
+            var remaining = window.EndsAt.Value.ToLocalTime() - DateTimeOffset.Now;
+            daysLeft = Math.Max(0, (int)remaining.TotalDays);
+
+            // Estimate total window as 60 days (typical BISE window duration)
+            var totalDays = 60.0;
+
+            var elapsed = totalDays - remaining.TotalDays;
+            progressPct = Math.Clamp(elapsed / totalDays * 100, 0, 100);
+            progressLabel = $"{daysLeft} days remaining of {(int)totalDays} day window";
+        }
+        else if (isClosed)
+        {
+            daysLeft = 0;
+            progressPct = 100;
+            progressLabel = "Registration window has closed";
+        }
+
+        // Ring: proportion of time left
+        double ringProgress = isClosed ? 1.0 : (daysLeft > 0 ? Math.Clamp(1.0 - (daysLeft / 60.0), 0, 1) : 1.0);
+        double dashOffset = Circumference * (1 - ringProgress);
+
+        var phaseText = isClosed ? "Closed" : isGrace ? "Grace Period" : "Open";
+        var phaseClass = isClosed ? "phase-closed" : isGrace ? "phase-grace" : "phase-open";
+        var ringClass = isClosed ? "ring-closed" : isGrace ? "ring-grace" : "ring-open";
+        var progressClass = isClosed ? "progress-closed" : isGrace ? "progress-grace" : "progress-open";
+
+        return new DeadlineDisplayInfo(
+            daysLeft, phaseText, phaseClass, ringClass, progressClass,
+            dashOffset, Math.Round(progressPct, 1), progressLabel,
+            $"{Circumference:F2}"
+        );
+    }
+}

@@ -1,4 +1,4 @@
-﻿using BiseSukkur.Application.Commands.Enrollment;
+using BiseSukkur.Application.Commands.Enrollment;
 using BiseSukkur.Application.Validators;
 using BiseSukkur.Core.DTOs;
 using BiseSukkur.Core.Enums;
@@ -93,6 +93,55 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
+
+        // Server-side cookie validation: check DB on every HTTP request
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnValidatePrincipal = async context =>
+            {
+                var principal = context.Principal;
+                if (principal?.Identity?.IsAuthenticated != true) return;
+
+                var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var roleClaim = principal.FindFirst(ClaimTypes.Role)?.Value;
+
+                if (!int.TryParse(userIdClaim, out var userId) || string.IsNullOrEmpty(roleClaim))
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    return;
+                }
+
+                try
+                {
+                    using var scope = context.HttpContext.RequestServices.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                    var user = await db.Users
+                        .AsNoTracking()
+                        .IgnoreQueryFilters()
+                        .Where(u => u.Id == userId)
+                        .Select(u => new { u.IsActive, u.Role, u.LockoutEnd })
+                        .FirstOrDefaultAsync();
+
+                    // Reject if user deleted, deactivated, locked out, or role changed
+                    bool reject = user == null
+                        || !user.IsActive
+                        || (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+                        || user.Role.ToString() != roleClaim;
+
+                    if (reject)
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                }
+                catch
+                {
+                    // On DB errors, allow the request through rather than blocking all users
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorizationCore();
@@ -277,6 +326,10 @@ app.MapPost("/api/auth/login", async (
     [FromForm] string? mfaCode,
     [FromForm] string? returnUrl) =>
 {
+    // 1. Force clear any existing authentication cookie first to prevent session leakage across different accounts
+    await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+    // 2. Validate credentials against database
     var response = await authService.LoginAsync(new LoginRequest { Username = username, Password = password, MfaCode = mfaCode });
     if (!response.Success || response.User == null)
     {
@@ -285,6 +338,7 @@ app.MapPost("/api/auth/login", async (
         return Results.Redirect($"/login?error={error}{mfa}");
     }
 
+    // 3. Issue fresh authentication cookie with strict role claims
     var identity = new ClaimsIdentity(response.User.ToClaims(), CookieAuthenticationDefaults.AuthenticationScheme);
     var principal = new ClaimsPrincipal(identity);
     var authProps = new AuthenticationProperties
@@ -301,21 +355,48 @@ app.MapPost("/api/auth/login", async (
         return Results.Redirect("/auth/forced-password-change");
     }
 
-    if (!string.IsNullOrEmpty(returnUrl) && returnUrl.StartsWith("/"))
+    // 4. Determine authoritative role-based destination
+    string defaultDashboard = response.User.Role switch
     {
-        return Results.Redirect(returnUrl);
+        UserRole.SuperAdmin => "/superadmin/dashboard",
+        UserRole.DistrictAdmin => "/district/dashboard",
+        UserRole.SchoolAdmin => "/school/dashboard",
+        _ => "/login"
+    };
+
+    // 5. Strict role validation for returnUrl (prevents cross-role navigation or redirecting new user to previous user's URL)
+    if (!string.IsNullOrEmpty(returnUrl) && returnUrl.StartsWith("/") && !returnUrl.StartsWith("//") && !returnUrl.StartsWith("/login", StringComparison.OrdinalIgnoreCase))
+    {
+        bool isAllowedForRole = response.User.Role switch
+        {
+            UserRole.SuperAdmin => !returnUrl.StartsWith("/school/", StringComparison.OrdinalIgnoreCase) && !returnUrl.StartsWith("/district/", StringComparison.OrdinalIgnoreCase),
+            UserRole.DistrictAdmin => returnUrl.StartsWith("/district/", StringComparison.OrdinalIgnoreCase) || returnUrl.StartsWith("/reports/", StringComparison.OrdinalIgnoreCase) || returnUrl.StartsWith("/print/", StringComparison.OrdinalIgnoreCase),
+            UserRole.SchoolAdmin => returnUrl.StartsWith("/school/", StringComparison.OrdinalIgnoreCase) || returnUrl.StartsWith("/print/", StringComparison.OrdinalIgnoreCase) || returnUrl.StartsWith("/certificate/", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+
+        if (isAllowedForRole)
+        {
+            return Results.Redirect(returnUrl);
+        }
     }
 
-    return response.User.Role switch
-    {
-        UserRole.SuperAdmin => Results.Redirect("/superadmin/dashboard"),
-        UserRole.DistrictAdmin => Results.Redirect("/district/dashboard"),
-        UserRole.SchoolAdmin => Results.Redirect("/school/dashboard"),
-        _ => Results.Redirect("/login")
-    };
+    return Results.Redirect(defaultDashboard);
 });
 
 app.MapPost("/api/auth/logout", async (HttpContext httpContext) =>
+{
+    await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/login");
+});
+
+app.MapGet("/logout", async (HttpContext httpContext) =>
+{
+    await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/login");
+});
+
+app.MapGet("/api/auth/logout", async (HttpContext httpContext) =>
 {
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/login");

@@ -1,6 +1,7 @@
 @page "/login"
 @layout LoginLayout
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="auth-card" style="max-width: 440px; width: 100%; margin: auto; padding: 2rem; background: var(--surface, #ffffff); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
     <div class="auth-header" style="text-align: center; margin-bottom: 1.5rem;">
@@ -15,6 +16,19 @@
         <div class="alert-banner danger" style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 0.8125rem; display: flex; align-items: center; gap: 0.5rem;">
             <span>⚠️</span>
             <span>@Error</span>
+        </div>
+    }
+
+    @if (isAuthenticated)
+    {
+        <div class="alert-banner info" style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 0.8125rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+            <div>
+                <div style="font-weight: 700;">Active Session: @currentUsername (@currentUserRole)</div>
+                <div style="font-size: 0.72rem; color: #3b82f6; margin-top: 2px;">Signing in below will immediately replace this session.</div>
+            </div>
+            <a href="/logout" class="btn btn-sm" style="background: #dc2626; color: #ffffff; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; text-decoration: none; font-weight: 600; white-space: nowrap;">
+                Sign Out
+            </a>
         </div>
     }
 
@@ -136,6 +150,22 @@
     private string usernameValue = "";
     private string passwordValue = "";
     private bool showPassword = false;
+
+    private bool isAuthenticated = false;
+    private string? currentUsername;
+    private string? currentUserRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            isAuthenticated = true;
+            currentUsername = user.Identity.Name;
+            currentUserRole = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        }
+    }
 
     private void TogglePasswordVisibility()
     {

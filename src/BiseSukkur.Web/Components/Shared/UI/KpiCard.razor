@@ -1,19 +1,19 @@
 <div class="kpi-card @GetVariantClass()" style="@CustomStyle">
+    <!-- Decorative background icon -->
+    @if (!string.IsNullOrEmpty(DecorativeIcon))
+    {
+        <div class="kpi-deco-icon">
+            <MudIcon Icon="@DecorativeIcon" Style="font-size: 3.5rem; opacity: 0.12;" />
+        </div>
+    }
+
     <div class="kpi-header">
         <span class="kpi-label">@Title</span>
-        @if (!string.IsNullOrEmpty(BadgeText))
-        {
-            <span class="kpi-badge">@BadgeText</span>
-        }
-        else if (!string.IsNullOrEmpty(Icon))
-        {
-            <span class="kpi-icon">@Icon</span>
-        }
     </div>
-    <div class="kpi-value @(IsMono ? "cell-mono" : "")">
+    <div class="kpi-value @(IsMono ? "kpi-value-mono" : "")">
         @if (IsLoading)
         {
-            <span class="skeleton-pulse" style="display: inline-block; width: 60%; height: 2rem; border-radius: 4px;"></span>
+            <span class="skeleton-pulse" style="display: inline-block; width: 60%; height: 2.25rem; border-radius: 6px;"></span>
         }
         else
         {
@@ -30,9 +30,10 @@
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string Value { get; set; } = "0";
     [Parameter] public string? Subtitle { get; set; }
-    [Parameter] public string? BadgeText { get; set; }
+    [Parameter] public string? BadgeText { get; set; } // Kept for backward compat, not rendered
     [Parameter] public string? Icon { get; set; }
-    [Parameter] public string Variant { get; set; } = "blue"; // blue, green, amber, purple, cyan, red
+    [Parameter] public string? DecorativeIcon { get; set; } // MudBlazor icon string for background decoration
+    [Parameter] public string Variant { get; set; } = "blue";
     [Parameter] public bool IsMono { get; set; } = false;
     [Parameter] public bool IsLoading { get; set; } = false;
     [Parameter] public string? CustomStyle { get; set; }

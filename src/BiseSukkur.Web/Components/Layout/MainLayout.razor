@@ -56,15 +56,24 @@
             </div>
 
             <div class="top-actions">
-                <button type="button" class="btn btn-secondary btn-sm" @onclick="ToggleTheme" title="Toggle Light/Dark Theme">
-                    Theme
-                </button>
+                <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                               Color="Color.Default" Size="Size.Small"
+                               OnClick="ToggleTheme"
+                               aria-label="Toggle Light/Dark Theme" />
 
                 <AuthorizeView>
                     <Authorized>
-                        <button type="button" class="btn btn-secondary btn-sm" @onclick="HandleLogout">
-                            Logout
-                        </button>
+                        <MudIconButton Icon="@Icons.Material.Filled.Lock"
+                                       Color="Color.Default" Size="Size.Small"
+                                       OnClick="OpenChangePasswordDialog"
+                                       aria-label="Change Password" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                                       Color="Color.Error" Size="Size.Small"
+                                       OnClick="HandleLogout"
+                                       aria-label="Sign Out" />
+                        <MudChip T="string" Color="Color.Dark" Size="Size.Small" Style="margin-left: 0.25rem; cursor: default;">
+                            @context.User.Identity?.Name?.Substring(0, Math.Min(1, context.User.Identity.Name.Length)).ToUpper()
+                        </MudChip>
                     </Authorized>
                     <NotAuthorized>
                         <a href="login" class="btn btn-primary btn-sm">Login</a>
@@ -84,6 +93,7 @@
 @code {
     private bool isSidebarCollapsed = false;
     private bool isMobileOpen = false;
+    private bool _isDarkMode = false;
 
     private async Task ToggleSidebar()
     {
@@ -100,7 +110,14 @@
 
     private async Task ToggleTheme()
     {
+        _isDarkMode = !_isDarkMode;
         await JSRuntime.InvokeVoidAsync("biseApp.toggleTheme");
+    }
+
+    private async Task OpenChangePasswordDialog()
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        await DialogService.ShowAsync<ChangePasswordDialog>("Change Password", options);
     }
 
     private async Task HandleLogout()

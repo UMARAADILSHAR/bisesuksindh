@@ -1,7 +1,5 @@
 @inject CustomAuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
-@inject IDialogService DialogService
 @inject IServiceScopeFactory ScopeFactory
 @implements IDisposable
 
@@ -193,35 +191,8 @@
     </AuthorizeView>
 </div>
 
-<div class="sidebar-footer">
-    <AuthorizeView>
-        <Authorized>
-            <div class="user-profile-badge" style="flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.65rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div class="user-avatar">
-                        @context.User.Identity?.Name?.Substring(0, Math.Min(1, context.User.Identity.Name.Length)).ToUpper()
-                    </div>
-                    <div class="user-info" style="flex: 1; min-width: 0;">
-                        <div class="user-info-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@context.User.Identity?.Name</div>
-                        <div class="user-info-role">@(AuthStateProvider.CurrentUserSession?.Role.ToString() ?? "User")</div>
-                    </div>
-                </div>
 
-                <div style="display: flex; gap: 0.35rem;">
-                    <button type="button" @onclick="OpenChangePasswordDialog" class="btn-action btn-action-secondary" style="flex: 1; padding: 0.25rem 0.4rem; font-size: 0.6875rem; text-align: center;">
-                        Password
-                    </button>
-                    <button type="button" @onclick="HandleLogout" title="Logout" class="btn-action btn-action-danger" style="flex: 1; padding: 0.25rem 0.4rem; font-size: 0.6875rem; text-align: center;">
-                        Sign Out
-                    </button>
-                </div>
-            </div>
-        </Authorized>
-        <NotAuthorized>
-            <a href="login" class="btn btn-primary btn-sm" style="width: 100%;">Sign In</a>
-        </NotAuthorized>
-    </AuthorizeView>
-</div>
+
 
 @code {
     private int pendingInvoiceCount = 0;
@@ -269,33 +240,11 @@
         }
     }
 
+
     public void Dispose()
     {
         _cts?.Cancel();
         _cts?.Dispose();
     }
-
-    private async Task OpenChangePasswordDialog()
-    {
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
-        await DialogService.ShowAsync<ChangePasswordDialog>("Change Password", options);
-    }
-
-    private async Task HandleLogout()
-    {
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { x => x.ContentText, "Are you sure you want to sign out of the BISE Sukkur Portal?" },
-            { x => x.ButtonText, "Sign Out" },
-            { x => x.Color, Color.Error }
-        };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Sign Out", parameters, options);
-        var result = await dialog.Result;
-
-        if (result != null && !result.Canceled)
-        {
-            await JSRuntime.InvokeVoidAsync("biseApp.submitLogout");
-        }
-    }
 }
+
