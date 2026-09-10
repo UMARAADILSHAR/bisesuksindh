@@ -102,85 +102,93 @@ else
         </MudGrid>
     </MudPaper>
 
-    <!-- MudDataGrid Server-Side Pagination Table -->
+    <!-- MudDataGrid Server-Side Pagination Table (Fixed Table Layout) -->
     <MudDataGrid T="Enrollment" ServerData="LoadServerData" @ref="_dataGrid"
                  Dense="true" Hover="true" Striped="true" Bordered="true"
-                 Loading="@isLoadingData" RowsPerPage="25"
+                 FixedHeader="true" Loading="@isLoadingData" RowsPerPage="25"
                  SortMode="SortMode.Single" Filterable="false"
-                 Style="border-radius: 8px; overflow: hidden;">
+                 Class="enrollment-fixed-grid"
+                 Style="border-radius: 8px; overflow: hidden; width: 100%;">
         <Columns>
-            <PropertyColumn Property="x => x.StudentName" Title="Candidate Name" Sortable="true" Style="min-width: 190px;">
+            <PropertyColumn Property="x => x.StudentName" Title="Candidate Name" Sortable="true" 
+                            HeaderClass="enrollment-header" CellClass="enrollment-cell" Style="width: 22%;">
                 <CellTemplate>
-                    <strong style="text-transform: uppercase; color: var(--mud-palette-text-primary);">@context.Item.StudentName</strong>
+                    <span style="text-transform: uppercase; color: var(--mud-palette-text-primary);">@context.Item.StudentName</span>
                     @if (!string.IsNullOrEmpty(context.Item.Surname))
                     {
-                        <span style="font-size: 0.72rem; color: var(--mud-palette-text-secondary); text-transform: uppercase;"> (@context.Item.Surname)</span>
+                        <span style="color: var(--mud-palette-text-secondary); text-transform: uppercase;"> (@context.Item.Surname)</span>
                     }
                 </CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.FatherName" Title="Father's Name" Style="min-width: 160px;">
+            <PropertyColumn Property="x => x.FatherName" Title="Father's Name" 
+                            HeaderClass="enrollment-header" CellClass="enrollment-cell" Style="width: 20%;">
                 <CellTemplate>
                     <span style="text-transform: uppercase; color: var(--mud-palette-text-secondary);">@(context.Item.FatherName ?? "-")</span>
                 </CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.GrNumber" Title="GR No" Sortable="true" Style="width: 120px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+            <PropertyColumn Property="x => x.GrNumber" Title="GR No" Sortable="true" 
+                            HeaderClass="enrollment-header text-center" CellClass="enrollment-cell text-center" Style="width: 11%;">
                 <CellTemplate>
                     @if (!string.IsNullOrEmpty(context.Item.GrNumber))
                     {
                         <MudTooltip Text="Click to copy GR #" Placement="Placement.Top">
                             <span @onclick="@(() => CopyToClipboard(context.Item.GrNumber, "GR #"))"
                                   @onclick:stopPropagation="true"
-                                  style="font-family: monospace; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.04); border: 1px dashed rgba(0,0,0,0.15);"
+                                  style="font-family: monospace; font-weight: 400; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.04); border: 1px dashed rgba(0,0,0,0.15);"
                                   title="Click to copy">
                                 @context.Item.GrNumber
-                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.75rem; opacity: 0.65;" />
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.875rem; opacity: 0.65;" />
                             </span>
                         </MudTooltip>
                     }
                     else
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Default">-</MudText>
+                        <span style="color: var(--mud-palette-text-secondary);">-</span>
                     }
                 </CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.EnrollmentNumber" Title="Enrollment No" Sortable="true" Style="width: 185px; white-space: nowrap;">
+            <PropertyColumn Property="x => x.EnrollmentNumber" Title="Enrollment No" Sortable="true" 
+                            HeaderClass="enrollment-header" CellClass="enrollment-cell" Style="width: 18%;">
                 <CellTemplate>
                     @if (!string.IsNullOrEmpty(context.Item.EnrollmentNumber))
                     {
                         <MudTooltip Text="Click to copy Enrollment #" Placement="Placement.Top">
                             <span @onclick="@(() => CopyToClipboard(context.Item.EnrollmentNumber, "Enrollment #"))"
                                   @onclick:stopPropagation="true"
-                                  style="font-family: monospace; font-weight: 700; color: #047857; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 4px; background: rgba(5, 150, 105, 0.08); border: 1px solid rgba(5, 150, 105, 0.25);"
+                                  style="font-family: monospace; font-weight: 400; color: #047857; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 4px; background: rgba(5, 150, 105, 0.08); border: 1px solid rgba(5, 150, 105, 0.25);"
                                   title="Click to copy">
                                 @context.Item.EnrollmentNumber
-                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.85rem; opacity: 0.75;" />
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Style="font-size: 0.875rem; opacity: 0.75;" />
                             </span>
                         </MudTooltip>
                     }
                     else
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Pending</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Style="font-size: 0.875rem; font-weight: 400;">Pending</MudChip>
                     }
                 </CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.ClassLevel" Title="Class" Style="width: 95px; text-align: center; white-space: nowrap;" HeaderStyle="text-align: center;">
+            <PropertyColumn Property="x => x.ClassLevel" Title="Class" 
+                            HeaderClass="enrollment-header text-center" CellClass="enrollment-cell text-center" Style="width: 9%;">
                 <CellTemplate>
-                    <strong>@context.Item.ClassLevel</strong>
+                    <span style="font-weight: 400;">@context.Item.ClassLevel</span>
                 </CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.Group" Title="Group" Style="width: 145px; white-space: nowrap;">
+            <PropertyColumn Property="x => x.Group" Title="Group" 
+                            HeaderClass="enrollment-header text-center" CellClass="enrollment-cell text-center" Style="width: 10%;">
                 <CellTemplate>
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@context.Item.Group</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Style="font-size: 0.875rem; font-weight: 400;">@context.Item.Group</MudChip>
                 </CellTemplate>
             </PropertyColumn>
-            <TemplateColumn Title="Actions" StickyRight="true" Sortable="false" Style="width: 175px; text-align: right; white-space: nowrap;" HeaderStyle="text-align: right;">
+            <TemplateColumn Title="Actions" StickyRight="true" Sortable="false" 
+                            HeaderClass="enrollment-header text-right" CellClass="enrollment-cell text-right" Style="width: 10%;">
                 <CellTemplate>
                     <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="@($"school/enrollments/{context.Item.Id}/edit")">Edit</MudButton>
-                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="() => PromptDelete(context.Item)">Delete</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="@($"school/enrollments/{context.Item.Id}/edit")" Style="font-size: 0.875rem; font-weight: 400;">Edit</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="() => PromptDelete(context.Item)" Style="font-size: 0.875rem; font-weight: 400;">Delete</MudButton>
                         @if (!string.IsNullOrEmpty(context.Item.EnrollmentNumber))
                         {
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Href="@($"api/pdf/enrollment-card/{context.Item.Id}")" Target="_blank">Card</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Href="@($"api/pdf/enrollment-card/{context.Item.Id}")" Target="_blank" Style="font-size: 0.875rem; font-weight: 400;">Card</MudButton>
                         }
                     </MudStack>
                 </CellTemplate>
@@ -198,6 +206,59 @@ else
             <MudDataGridPager T="Enrollment" PageSizeOptions="new[] { 10, 25, 50, 100 }" />
         </PagerContent>
     </MudDataGrid>
+
+    <style>
+        /* Table fixed layout */
+        .enrollment-fixed-grid table {
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+
+        /* Uniform font size across all columns, bold only for headers */
+        .enrollment-fixed-grid th,
+        .enrollment-fixed-grid .mud-table-head th,
+        .enrollment-fixed-grid .enrollment-header {
+            font-size: 0.875rem !important;
+            font-weight: 700 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            background-color: var(--mud-palette-background-grey) !important;
+            color: var(--mud-palette-text-primary) !important;
+        }
+
+        /* Data cells: same font size, regular/normal weight */
+        .enrollment-fixed-grid td,
+        .enrollment-fixed-grid .mud-table-body td,
+        .enrollment-fixed-grid .enrollment-cell {
+            font-size: 0.875rem !important;
+            font-weight: 400 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        /* Enforce regular weight and identical font size inside cell child elements */
+        .enrollment-fixed-grid .enrollment-cell *,
+        .enrollment-fixed-grid .mud-table-body td * {
+            font-size: 0.875rem !important;
+            font-weight: 400 !important;
+        }
+
+        .enrollment-fixed-grid .text-center,
+        .enrollment-fixed-grid .text-center th,
+        .enrollment-fixed-grid .text-center td {
+            text-align: center !important;
+            justify-content: center !important;
+        }
+
+        .enrollment-fixed-grid .text-right,
+        .enrollment-fixed-grid .text-right th,
+        .enrollment-fixed-grid .text-right td {
+            text-align: right !important;
+            justify-content: flex-end !important;
+        }
+    </style>
 }
 
 @code {
