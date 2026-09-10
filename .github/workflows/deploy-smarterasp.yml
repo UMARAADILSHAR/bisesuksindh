@@ -25,16 +25,21 @@ jobs:
     - name: Run Test Suite
       run: dotnet test BiseSukkur.slnx --configuration Release --no-restore --verbosity normal
 
+    - name: Check Deployment Credentials
+      id: check_creds
+      run: |
+        $hasWebDeploy = "${{ secrets.SMARTERASP_PASSWORD }}" -ne ""
+        $hasFtp = "${{ secrets.SMARTERASP_FTP_PASSWORD }}" -ne ""
+        if (-not $hasWebDeploy -and -not $hasFtp) {
+          Write-Host "::warning ::SMARTERASP_PASSWORD secret is not set in GitHub repository settings. Automatic deployment step was skipped. To enable auto-deploy on git push, add SMARTERASP_PASSWORD under GitHub -> Settings -> Secrets and variables -> Actions."
+        }
+
     - name: Deploy to SmarterASP.NET via Web Deploy
-      if: env.HAS_DEPLOY_SECRET == 'true'
-      env:
-        HAS_DEPLOY_SECRET: ${{ secrets.SMARTERASP_PASSWORD != '' }}
+      if: ${{ secrets.SMARTERASP_PASSWORD != '' }}
       run: |
         dotnet publish src/BiseSukkur.Web/BiseSukkur.Web.csproj -c Release /p:PublishProfile="indussoftwaretec-001-site1 - Web Deploy" /p:Password="${{ secrets.SMARTERASP_PASSWORD }}" /p:AllowUntrustedCertificate=True
 
     - name: Fallback Deploy via FTP
-      if: env.HAS_FTP_SECRET == 'true' && env.HAS_DEPLOY_SECRET != 'true'
-      env:
-        HAS_FTP_SECRET: ${{ secrets.SMARTERASP_FTP_PASSWORD != '' }}
+      if: ${{ secrets.SMARTERASP_FTP_PASSWORD != '' && secrets.SMARTERASP_PASSWORD == '' }}
       run: |
         dotnet publish src/BiseSukkur.Web/BiseSukkur.Web.csproj -c Release /p:PublishProfile="indussoftwaretec-001-site1 - FTP" /p:Password="${{ secrets.SMARTERASP_FTP_PASSWORD }}"
